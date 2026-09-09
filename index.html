@@ -314,8 +314,8 @@
       <h2>Nuevo Aviso</h2>
       
       <div class="form-group">
-        <label for="origin">Procedencia (Fijado por URL)</label>
-        <input type="text" id="origin" readonly title="La procedencia está definida por la URL del equipo">
+        <label for="origin">Procedencia (Definido por URL)</label>
+        <input type="text" id="origin" readonly title="La procedencia se determina automáticamente desde la URL">
       </div>
 
       <div class="form-group">
@@ -388,22 +388,29 @@
       config: { broadcast: { self: true } }
     });
 
-    const channels = ["Todas", "Thalamus", "Scaner", "Rayos 3", "Rayos 4", "Rayos 5", "Eco 3"];
+    const validRooms = ["Thalamus", "Scaner", "Rayos 3", "Rayos 4", "Rayos 5", "Eco 3"];
+    const channels = ["Todas", ...validRooms];
     let currentFilter = "Todas";
     let notices = [];
     let audioCtx = null;
-    let roomOrigin = "Thalamus"; // Valor por defecto
+    let roomOrigin = "Thalamus"; // Valor por defecto si no hay URL
 
-    // Obtener la procedencia estrictamente desde la URL (?sala=...)
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlSala = urlParams.get('sala');
+    // DETECCIÓN DINÁMICA DE LA SALA DESDE LA URL
+    function detectRoomFromURL() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const rawSala = urlParams.get('sala');
 
-    if (urlSala && channels.includes(urlSala)) {
-      roomOrigin = urlSala;
-      currentFilter = urlSala; // Inicializa la vista en la sala correspondiente
+      if (rawSala) {
+        // Busca si coincide con alguna sala sin importar mayúsculas/minúsculas ni espacios codificados (%20)
+        const match = validRooms.find(r => r.toLowerCase() === rawSala.trim().toLowerCase());
+        if (match) {
+          roomOrigin = match;
+          currentFilter = match; // Se enfoca automáticamente en la sala de la URL
+        }
+      }
     }
 
-    // Configurar la procedencia en la interfaz
+    // Configurar la interfaz según la procedencia detectada
     function setupOriginUI() {
       const originInput = document.getElementById('origin');
       originInput.value = roomOrigin;
@@ -414,7 +421,7 @@
       // Solo Thalamus puede emitir a TODAS las salas
       if (roomOrigin !== "Thalamus") {
         optTodas.disabled = true;
-        // Si por defecto estaba en TODAS, lo cambia a otra opción válida
+        // Si por defecto estaba seleccionado TODAS, lo cambia al primer destino válido diferente
         if (destinySelect.value === "TODAS") {
           destinySelect.value = roomOrigin === "Scaner" ? "Thalamus" : "Scaner";
         }
@@ -469,7 +476,7 @@
       document.getElementById('urgency').value = urgency;
     }
 
-    // Configurar Escucha de WebSocket
+    // Configurar Escucha WebSocket
     channel
       .on('broadcast', { event: 'nuevo-aviso' }, ({ payload }) => {
         notices.unshift(...payload.newNotices);
@@ -513,14 +520,13 @@
         return;
       }
 
-      // Restricción adicional por seguridad
       if (destiny === "TODAS" && roomOrigin !== "Thalamus") {
         alert("Solo la sala Thalamus puede enviar avisos a TODAS las salas.");
         return;
       }
 
       const targetChannels = destiny === "TODAS" 
-        ? channels.filter(c => c !== "Todas") 
+        ? validRooms 
         : [destiny];
 
       const now = new Date();
@@ -553,7 +559,7 @@
       }
 
       const targetChannels = destiny === "TODAS" 
-        ? channels.filter(c => c !== "Todas") 
+        ? validRooms 
         : [destiny];
 
       const now = new Date();
@@ -681,7 +687,8 @@
       }).join('');
     }
 
-    // Inicialización
+    // Inicialización del script
+    detectRoomFromURL();
     setupOriginUI();
     initChannels();
     renderNotices();
