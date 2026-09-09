@@ -307,8 +307,13 @@
     const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/"; 
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    const channel = supabaseClient.channel('canal-avisos-hospital');
 
+// Se configura el canal permitiendo broadcast público de auto-envío (self: true)
+const channel = supabaseClient.channel('canal-avisos-hospital', {
+  config: {
+    broadcast: { self: true }
+  }
+});
     // Configuración exacta de salas (Incluyendo Thalamus)
     const channels = ["Todas", "Thalamus", "Scaner", "Rayos 3", "Rayos 4", "Rayos 5", "Eco 3"];
     let currentFilter = "Todas";
