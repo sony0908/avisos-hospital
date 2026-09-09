@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Avisos Hospitalarios</title>
+  <!-- CDN de Supabase para cliente JS -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      --primary: #0056b3;
+      --text: #333333;
+      
+      /* Colores por Nivel de Urgencia */
+      --urg-inmediato: #d9534f;
+      --urg-urgente: #f0ad4e;
+      --urg-normal: #5bc0de;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+
+    .container {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .form-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+
+    select, input, button {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 0.95rem;
+    }
+
+    .quick-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .quick-btn {
+      background-color: #e9ecef;
+      color: #333;
+      border: 1px solid #ced4da;
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 8px;
+      border-radius: 4px;
+      text-align: left;
+    }
+
+    .quick-btn:hover {
+      background-color: #dee2e6;
+    }
+
+    button.send-btn {
+      background-color: var(--primary);
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button.send-btn:hover {
+      background-color: #003d80;
+    }
+
+    /* Status indicador de conexión */
+    .status-bar {
+      text-align: right;
+      font-size: 0.8rem;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+    .status-online { color: #28a745; }
+    .status-offline { color: #dc3545; }
+
+    /* Barra de Filtro de Salas */
+    .channel-bar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      overflow-x: auto;
+      padding-bottom: 5px;
+    }
+
+    .channel-tab {
+      padding: 8px 16px;
+      background: #e2e8f0;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    .channel-tab.active {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Rejilla de Avisos */
+    .alerts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 15px;
+    }
+
+    .alert-card {
+      background: var(--card-bg);
+      border-left: 8px solid var(--primary);
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+      position: relative;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .alert-card.inmediato {
+      border-left-color: var(--urg-inmediato);
+      background-color: #fff5f5;
+    }
+
+    .alert-card.urgente {
+      border-left-color: var(--urg-urgente);
+      background-color: #fffdf5;
+    }
+
+    .alert-card.no-tan-urgente {
+      border-left-color: var(--urg-normal);
+      background-color: #f5fcff;
+    }
+
+    .badge-container {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .channel-badge {
+      background: #e2e8f0;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #4a5568;
+    }
+
+    .urgency-badge {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: white;
+    }
+
+    .urgency-badge.inmediato { background-color: var(--urg-inmediato); }
+    .urgency-badge.urgente { background-color: var(--urg-urgente); }
+    .urgency-badge.no-tan-urgente { background-color: var(--urg-normal); }
+
+    .alert-info p {
+      margin: 5px 0 0 0;
+      color: #2d3748;
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+
+    .alert-time {
+      margin-top: 12px;
+      font-size: 0.75rem;
+      color: #718096;
+      text-align: right;
+    }
+
+    .close-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: transparent;
+      border: none;
+      color: #aaa;
+      font-size: 1.1rem;
+      cursor: pointer;
+      width: auto;
+      padding: 0;
+    }
+
+    .close-btn:hover {
+      color: var(--urg-inmediato);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Centro de Avisos Hospitalarios</h1>
+
+  <div class="container">
+    <!-- Panel Emisor -->
+    <div class="panel">
+      <h2>Nuevo Aviso</h2>
+      
+      <div class="form-group">
+        <label for="destiny">Sala / Destino</label>
+        <select id="destiny">
+          <option value="TODAS">⚠️ Enviar a TODAS las salas</option>
+          <option value="Scaner">Scaner</option>
+          <option value="Rayos 3">Rayos 3</option>
+          <option value="Rayos 4">Rayos 4</option>
+          <option value="Rayos 5">Rayos 5</option>
+          <option value="Eco 3">Eco 3</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="urgency">Nivel de Urgencia</label>
+        <select id="urgency">
+          <option value="Inmediato">🔴 Inmediato</option>
+          <option value="Urgente" selected>🟡 Urgente</option>
+          <option value="No tan urgente">🔵 No tan urgente</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Plantillas Rápidas</label>
+        <div class="quick-btns">
+          <button type="button" class="quick-btn" onclick="setQuickMessage('Llamaron del reanimador, vienen en 10 min', 'Inmediato')">🔴 Reanimador (en 10 min)</button>
+          <button type="button" class="quick-btn" onclick="setQuickMessage('Paciente prioritario en camino desde Urgencias', 'Urgente')">🟡 Urgencias (en camino)</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="message">Mensaje / Aviso</label>
+        <input type="text" id="message" placeholder="Ej: Llamaron del reanimador, vienen en 10m">
+      </div>
+
+      <button class="send-btn" onclick="sendNoticeRemote()">Enviar Aviso</button>
+    </div>
+
+    <!-- Tablero Receptor Multicanal -->
+    <div class="panel">
+      <div class="status-bar">
+        Estado Red: <span id="connectionStatus" class="status-offline">Conectando...</span>
+      </div>
+
+      <!-- Filtro de Salas -->
+      <div class="channel-bar" id="channelBar"></div>
+
+      <div id="alertsContainer" class="alerts-grid"></div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // CONFIGURACIÓN DE SUPABASE
+    // Reemplaza estas dos constantes con tus credenciales de Supabase
+    // -------------------------------------------------------------
+    const SUPABASE_URL = "https://TU_PROYECTO.supabase.co";
+    const SUPABASE_ANON_KEY = "TU_LLAVE_ANONIMA_SUPABASE";
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const channel = supabaseClient.channel('canal-avisos-hospital');
+
+    // Configuración de salas
+    const channels = ["Todas", "Scaner", "Rayos 3", "Rayos 4", "Rayos 5", "Eco 3"];
+    let currentFilter = "Todas";
+    let notices = [];
+
+    // Detectar si la URL incluye una sala predefinida (ej. ?sala=Rayos 3)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlSala = urlParams.get('sala');
+    if (urlSala && channels.includes(urlSala)) {
+      currentFilter = urlSala;
+    }
+
+    // Inicializar canales de la UI
+    function initChannels() {
+      const bar = document.getElementById('channelBar');
+      bar.innerHTML = channels.map(ch => `
+        <button class="channel-tab ${ch === currentFilter ? 'active' : ''}" onclick="filterChannel('${ch}')">
+          ${ch}
+        </button>
+      `).join('');
+    }
+
+    function filterChannel(channelName) {
+      currentFilter = channelName;
+      initChannels();
+      renderNotices();
+    }
+
+    function setQuickMessage(msg, urgency) {
+      document.getElementById('message').value = msg;
+      document.getElementById('urgency').value = urgency;
+    }
+
+    // -------------------------------------------------------------
+    // COMUNICACIÓN EN TIEMPO REAL (WEBSOCKETS)
+    // -------------------------------------------------------------
+
+    // Unirse al canal WebSocket
+    channel
+      .on('broadcast', { event: 'nuevo-aviso' }, ({ payload }) => {
+        notices.unshift(...payload.newNotices);
+        playAlertSound(payload.urgency);
+        renderNotices();
+      })
+      .on('broadcast', { event: 'borrar-aviso' }, ({ payload }) => {
+        notices = notices.filter(n => n.id !== payload.id);
+        renderNotices();
+      })
+      .subscribe((status) => {
+        const statusEl = document.getElementById('connectionStatus');
+        if (status === 'SUBSCRIBED') {
+          statusEl.textContent = 'En Línea 🟢';
+          statusEl.className = 'status-online';
+        } else {
+          statusEl.textContent = 'Desconectado 🔴';
+          statusEl.className = 'status-offline';
+        }
+      });
+
+    // Función para emitir aviso
+    function sendNoticeRemote() {
+      const destiny = document.getElementById('destiny').value;
+      const message = document.getElementById('message').value;
+      const urgency = document.getElementById('urgency').value;
+
+      if (!message.trim()) {
+        alert("Por favor, ingresa el texto del aviso.");
+        return;
+      }
+
+      const targetChannels = destiny === "TODAS" 
+        ? channels.filter(c => c !== "Todas") 
+        : [destiny];
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const newNotices = targetChannels.map(ch => ({
+        id: Date.now() + Math.random(),
+        destiny: ch,
+        message,
+        urgency,
+        timeStr
+      }));
+
+      // Agregar localmente
+      notices.unshift(...newNotices);
+      playAlertSound(urgency);
+      renderNotices();
+
+      // Transmitir a todas las otras pantallas
+      channel.send({
+        type: 'broadcast',
+        event: 'nuevo-aviso',
+        payload: { newNotices, urgency }
+      });
+
+      document.getElementById('message').value = '';
+    }
+
+    // Función para borrar aviso
+    function removeNotice(id) {
+      notices = notices.filter(n => n.id !== id);
+      renderNotices();
+
+      // Notificar a las demás pantallas para que también lo borren
+      channel.send({
+        type: 'broadcast',
+        event: 'borrar-aviso',
+        payload: { id }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // RENDERIZADO Y SONIDO
+    // -------------------------------------------------------------
+
+    function playAlertSound(urgency) {
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      
+      let freq = 600;
+      if (urgency === 'Urgente') freq = 880;
+      if (urgency === 'Inmediato') freq = 1200;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      osc.start();
+      osc.stop(audioCtx.currentTime + (urgency === 'Inmediato' ? 0.5 : 0.25));
+    }
+
+    function renderNotices() {
+      const container = document.getElementById('alertsContainer');
+      
+      const filtered = currentFilter === "Todas" 
+        ? notices 
+        : notices.filter(n => n.destiny === currentFilter);
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<p style="color: #888; grid-column: 1/-1; text-align: center;">No hay avisos activos para ${currentFilter === "Todas" ? "ninguna sala" : currentFilter}.</p>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(n => {
+        const classUrgency = n.urgency.toLowerCase().replace(/ /g, '-');
+        
+        return `
+          <div class="alert-card ${classUrgency}">
+            <button class="close-btn" onclick="removeNotice(${n.id})">✖</button>
+            <div class="badge-container">
+              <span class="channel-badge">📍 ${n.destiny}</span>
+              <span class="urgency-badge ${classUrgency}">${n.urgency}</span>
+            </div>
+            <div class="alert-info">
+              <p>${n.message}</p>
+            </div>
+            <div class="alert-time">
+              Emitido a las ${n.timeStr} hrs
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    initChannels();
+    renderNotices();
+  </script>
+</body>
+</html>
