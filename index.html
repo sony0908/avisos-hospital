@@ -15,6 +15,7 @@
       --urg-inmediato: #d9534f;
       --urg-urgente: #f0ad4e;
       --urg-normal: #5bc0de;
+      --urg-zumbido: #9b59b6;
     }
 
     body {
@@ -23,6 +24,25 @@
       color: var(--text);
       margin: 0;
       padding: 20px;
+    }
+
+    /* Animación de Zumbido estilo Messenger */
+    @keyframes buzz {
+      0% { transform: translate(0, 0) rotate(0deg); }
+      10% { transform: translate(-10px, -10px) rotate(-2deg); }
+      20% { transform: translate(10px, 8px) rotate(2deg); }
+      30% { transform: translate(-10px, 6px) rotate(-1deg); }
+      40% { transform: translate(8px, -8px) rotate(1deg); }
+      50% { transform: translate(-8px, 8px) rotate(-2deg); }
+      60% { transform: translate(8px, -6px) rotate(2deg); }
+      70% { transform: translate(-6px, 6px) rotate(-1deg); }
+      80% { transform: translate(6px, -8px) rotate(1deg); }
+      90% { transform: translate(-4px, 4px) rotate(0deg); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    .buzz-effect {
+      animation: buzz 0.5s ease-in-out infinite;
     }
 
     h1 {
@@ -89,6 +109,27 @@
       font-size: 0.95rem;
     }
 
+    .emoji-bar {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
+
+    .emoji-btn {
+      width: auto;
+      padding: 4px 8px;
+      font-size: 1.1rem;
+      background: #f0f0f0;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .emoji-btn:hover {
+      background: #e0e0e0;
+    }
+
     .quick-btns {
       display: flex;
       flex-direction: column;
@@ -107,8 +148,22 @@
       text-align: left;
     }
 
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
     button.send-btn {
       background-color: var(--primary);
+      color: white;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+    }
+
+    button.buzz-btn {
+      background-color: #8e44ad;
       color: white;
       font-weight: bold;
       border: none;
@@ -177,10 +232,16 @@
       background-color: #f5fcff;
     }
 
+    .alert-card.zumbido {
+      border-left-color: var(--urg-zumbido);
+      background-color: #fcf4ff;
+    }
+
     .badge-container {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       margin-bottom: 10px;
+      flex-wrap: wrap;
     }
 
     .channel-badge {
@@ -190,6 +251,16 @@
       font-size: 0.75rem;
       font-weight: bold;
       color: #4a5568;
+    }
+
+    .origin-badge {
+      background: #edf2f7;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      color: #2d3748;
+      border: 1px solid #cbd5e0;
     }
 
     .urgency-badge {
@@ -203,6 +274,7 @@
     .urgency-badge.inmediato { background-color: var(--urg-inmediato); }
     .urgency-badge.urgente { background-color: var(--urg-urgente); }
     .urgency-badge.no-tan-urgente { background-color: var(--urg-normal); }
+    .urgency-badge.zumbido { background-color: var(--urg-zumbido); }
 
     .close-btn {
       position: absolute;
@@ -224,7 +296,7 @@
 
   <!-- Banner para Habilitar Permisos de Sonido y Ventanas Emergentes -->
   <div class="audio-banner" id="permBanner">
-    🔔 Para escuchar las alarmas sonoras y recibir ventanas emergentes:
+    🔔 Para escuchar las alarmas sonoras, zumbidos y recibir ventanas emergentes:
     <button class="audio-btn" onclick="enablePermissions()">Activar Alertas Visuales y Sonoras</button>
   </div>
 
@@ -234,9 +306,21 @@
       <h2>Nuevo Aviso</h2>
       
       <div class="form-group">
+        <label for="origin">Procedencia / De parte de:</label>
+        <select id="origin" onchange="handleOriginChange()">
+          <option value="Thalamus">Thalamus</option>
+          <option value="Scaner">Scaner</option>
+          <option value="Rayos 3">Rayos 3</option>
+          <option value="Rayos 4">Rayos 4</option>
+          <option value="Rayos 5">Rayos 5</option>
+          <option value="Eco 3">Eco 3</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label for="destiny">Sala / Destino</label>
         <select id="destiny">
-          <option value="TODAS">⚠️ Enviar a TODAS las salas</option>
+          <option value="TODAS" id="optTodas">⚠️ Enviar a TODAS las salas</option>
           <option value="Thalamus">Thalamus</option>
           <option value="Scaner">Scaner</option>
           <option value="Rayos 3">Rayos 3</option>
@@ -258,17 +342,29 @@
       <div class="form-group">
         <label>Plantillas Rápidas</label>
         <div class="quick-btns">
-          <button type="button" class="quick-btn" onclick="setQuickMessage('Llamaron del reanimador, vienen en 10 min', 'Inmediato')">🔴 Reanimador (en 10 min)</button>
-          <button type="button" class="quick-btn" onclick="setQuickMessage('Paciente prioritario en camino desde Urgencias', 'Urgente')">🟡 Urgencias (en camino)</button>
+          <button type="button" class="quick-btn" onclick="setQuickMessage('🚨 Llamaron del reanimador, vienen en 10 min', 'Inmediato')">🔴 Reanimador (en 10 min)</button>
+          <button type="button" class="quick-btn" onclick="setQuickMessage('🏥 Paciente prioritario en camino desde Urgencias', 'Urgente')">🟡 Urgencias (en camino)</button>
         </div>
       </div>
 
       <div class="form-group">
         <label for="message">Mensaje / Aviso</label>
         <input type="text" id="message" placeholder="Ej: Llamaron del reanimador, vienen en 10m">
+        <div class="emoji-bar">
+          <button type="button" class="emoji-btn" onclick="insertEmoji('🚨')">🚨</button>
+          <button type="button" class="emoji-btn" onclick="insertEmoji('⚠️')">⚠️</button>
+          <button type="button" class="emoji-btn" onclick="insertEmoji('🏥')">🏥</button>
+          <button type="button" class="emoji-btn" onclick="insertEmoji('🩺')">🩺</button>
+          <button type="button" class="emoji-btn" onclick="insertEmoji('🏃‍♂️')">🏃‍♂️</button>
+          <button type="button" class="emoji-btn" onclick="insertEmoji('✅')">✅</button>
+          <button type="button" class="emoji-btn" onclick="insertEmoji('⏰')">⏰</button>
+        </div>
       </div>
 
-      <button class="send-btn" onclick="sendNoticeRemote()">Enviar Aviso</button>
+      <div class="btn-group">
+        <button class="send-btn" onclick="sendNoticeRemote()">Enviar Aviso</button>
+        <button class="buzz-btn" onclick="sendBuzzRemote()" title="¡Hace vibrar la pantalla del receptor!">⚡ Zumbido</button>
+      </div>
     </div>
 
     <!-- Tablero Receptor -->
@@ -283,8 +379,8 @@
   </div>
 
   <script>
-    const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/"; 
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
+    const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/"; 
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
 
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const channel = supabaseClient.channel('canal-avisos-hospital', {
@@ -302,9 +398,30 @@
       currentFilter = urlSala;
     }
 
+    // Gestionar la opción "Enviar a TODAS las salas" según la procedencia
+    function handleOriginChange() {
+      const origin = document.getElementById('origin').value;
+      const optTodas = document.getElementById('optTodas');
+      const destinySelect = document.getElementById('destiny');
+
+      if (origin !== "Thalamus") {
+        optTodas.disabled = true;
+        if (destinySelect.value === "TODAS") {
+          destinySelect.value = origin === "Scaner" ? "Thalamus" : "Scaner";
+        }
+      } else {
+        optTodas.disabled = false;
+      }
+    }
+
+    function insertEmoji(emoji) {
+      const input = document.getElementById('message');
+      input.value += emoji;
+      input.focus();
+    }
+
     // Solicitud de Permisos
     function enablePermissions() {
-      // 1. Audio Context
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
@@ -312,7 +429,6 @@
         audioCtx.resume();
       }
 
-      // 2. Notificaciones Emergentes
       if ("Notification" in window) {
         Notification.requestPermission().then(permission => {
           if (permission === "granted") {
@@ -349,11 +465,15 @@
       .on('broadcast', { event: 'nuevo-aviso' }, ({ payload }) => {
         notices.unshift(...payload.newNotices);
         
-        // Verificar si el aviso pertenece a la sala abierta actualmente
         const belongsToRoom = payload.newNotices.some(n => n.destiny === currentFilter || currentFilter === "Todas");
         
         if (belongsToRoom) {
-          playAlarmSound(payload.urgency);
+          if (payload.urgency === 'Zumbido') {
+            triggerBuzzEffect();
+            playBuzzSound();
+          } else {
+            playAlarmSound(payload.urgency);
+          }
           showPopUpNotification(payload.newNotices[0]);
         }
         
@@ -375,12 +495,19 @@
       });
 
     function sendNoticeRemote() {
+      const origin = document.getElementById('origin').value;
       const destiny = document.getElementById('destiny').value;
       const message = document.getElementById('message').value;
       const urgency = document.getElementById('urgency').value;
 
       if (!message.trim()) {
         alert("Por favor, ingresa el texto del aviso.");
+        return;
+      }
+
+      // Restricción adicional por seguridad
+      if (destiny === "TODAS" && origin !== "Thalamus") {
+        alert("Solo la sala Thalamus puede enviar avisos a TODAS las salas.");
         return;
       }
 
@@ -393,6 +520,7 @@
 
       const newNotices = targetChannels.map(ch => ({
         id: Date.now() + Math.random(),
+        origin,
         destiny: ch,
         message,
         urgency,
@@ -408,6 +536,38 @@
       document.getElementById('message').value = '';
     }
 
+    function sendBuzzRemote() {
+      const origin = document.getElementById('origin').value;
+      const destiny = document.getElementById('destiny').value;
+
+      if (destiny === "TODAS" && origin !== "Thalamus") {
+        alert("Solo la sala Thalamus puede enviar zumbidos a TODAS las salas.");
+        return;
+      }
+
+      const targetChannels = destiny === "TODAS" 
+        ? channels.filter(c => c !== "Todas") 
+        : [destiny];
+
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+      const newNotices = targetChannels.map(ch => ({
+        id: Date.now() + Math.random(),
+        origin,
+        destiny: ch,
+        message: '⚡ ¡Te ha enviado un ZUMBIDO!',
+        urgency: 'Zumbido',
+        timeStr
+      }));
+
+      channel.send({
+        type: 'broadcast',
+        event: 'nuevo-aviso',
+        payload: { newNotices, urgency: 'Zumbido' }
+      });
+    }
+
     function removeNotice(id) {
       notices = notices.filter(n => n.id !== id);
       renderNotices();
@@ -419,16 +579,23 @@
       });
     }
 
-    // --- ALARMAS Y NOTIFICACIONES EMERGENTES ---
+    // --- ALARMAS, ZUMBIDOS Y EFECTOS ---
 
-    function playTone(freq, duration, delay = 0) {
+    function triggerBuzzEffect() {
+      document.body.classList.add('buzz-effect');
+      setTimeout(() => {
+        document.body.classList.remove('buzz-effect');
+      }, 1000);
+    }
+
+    function playTone(freq, duration, delay = 0, type = 'triangle') {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
       setTimeout(() => {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = 'triangle';
+        osc.type = type;
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
         
@@ -440,29 +607,37 @@
       }, delay);
     }
 
+    function playBuzzSound() {
+      // Tono característico de zumbido
+      playTone(150, 0.1, 0, 'sawtooth');
+      playTone(180, 0.1, 100, 'sawtooth');
+      playTone(150, 0.1, 200, 'sawtooth');
+      playTone(180, 0.2, 300, 'sawtooth');
+    }
+
     function playAlarmSound(urgency) {
       if (urgency === 'Inmediato') {
-        // Tono tipo sirena de emergencia (2 pitidos agudos seguidos)
         playTone(900, 0.2, 0);
         playTone(1200, 0.4, 250);
         playTone(900, 0.2, 700);
         playTone(1200, 0.4, 950);
       } else if (urgency === 'Urgente') {
-        // Tono de atención intermedio
         playTone(750, 0.3, 0);
         playTone(750, 0.3, 400);
       } else {
-        // Tono suave
         playTone(520, 0.3, 0);
       }
     }
 
     function showPopUpNotification(noticeData) {
       if ("Notification" in window && Notification.permission === "granted") {
-        const title = `🚨 [${noticeData.urgency.toUpperCase()}] Para ${noticeData.destiny}`;
+        const title = noticeData.urgency === 'Zumbido' 
+          ? `⚡ ¡ZUMBIDO de ${noticeData.origin}!`
+          : `🚨 [${noticeData.urgency.toUpperCase()}] De ${noticeData.origin} para ${noticeData.destiny}`;
+        
         const options = {
           body: noticeData.message,
-          requireInteraction: noticeData.urgency === 'Inmediato'
+          requireInteraction: noticeData.urgency === 'Inmediato' || noticeData.urgency === 'Zumbido'
         };
         new Notification(title, options);
       }
@@ -485,11 +660,12 @@
           <div class="alert-card ${classUrgency}">
             <button class="close-btn" onclick="removeNotice(${n.id})">✖</button>
             <div class="badge-container">
-              <span class="channel-badge">📍 ${n.destiny}</span>
+              <span class="origin-badge">De: ${n.origin || 'Desconocido'}</span>
+              <span class="channel-badge">Para: ${n.destiny}</span>
               <span class="urgency-badge ${classUrgency}">${n.urgency}</span>
             </div>
             <div class="alert-info">
-              <p>${n.message}</p>
+              <p style="font-weight: ${n.urgency === 'Zumbido' ? 'bold' : 'normal'}">${n.message}</p>
             </div>
             <div style="margin-top: 12px; font-size: 0.75rem; color: #718096; text-align: right;">
               Emitido a las ${n.timeStr} hrs
@@ -499,6 +675,8 @@
       }).join('');
     }
 
+    // Inicialización
+    handleOriginChange();
     initChannels();
     renderNotices();
   </script>
