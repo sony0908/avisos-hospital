@@ -109,14 +109,6 @@
       font-size: 0.95rem;
     }
 
-    /* Input bloqueado/deshabilitado para la procedencia */
-    input[readonly] {
-      background-color: #e9ecef;
-      cursor: not-allowed;
-      font-weight: bold;
-      color: var(--primary);
-    }
-
     .emoji-bar {
       display: flex;
       gap: 6px;
@@ -313,9 +305,17 @@
     <div class="panel">
       <h2>Nuevo Aviso</h2>
       
+      <!-- Selector de Procedencia Desbloqueado -->
       <div class="form-group">
-        <label for="origin">Procedencia (Definido por URL)</label>
-        <input type="text" id="origin" readonly title="La procedencia se determina automáticamente desde la URL">
+        <label for="origin">Procedencia (Emisor)</label>
+        <select id="origin" onchange="handleOriginChange()">
+          <option value="Thalamus">Thalamus</option>
+          <option value="Scaner">Scaner</option>
+          <option value="Rayos 3">Rayos 3</option>
+          <option value="Rayos 4">Rayos 4</option>
+          <option value="Rayos 5">Rayos 5</option>
+          <option value="Eco 3">Eco 3</option>
+        </select>
       </div>
 
       <div class="form-group">
@@ -393,9 +393,8 @@
     let currentFilter = "Todas";
     let notices = [];
     let audioCtx = null;
-    let roomOrigin = "Thalamus";
 
-    // OBTENCIÓN DIRECTA DE LA URL (Soporta minúsculas, guiones y %20)
+    // Detectar si la URL trae una sala preferida
     function getRoomFromURL() {
       const urlParams = new URLSearchParams(window.location.search);
       const rawSala = urlParams.get('sala') || urlParams.get('Sala');
@@ -403,31 +402,36 @@
       if (rawSala) {
         const cleanParam = decodeURIComponent(rawSala).replace(/[-_]/g, ' ').trim().toLowerCase();
         const found = validRooms.find(r => r.toLowerCase() === cleanParam);
-        if (found) {
-          return found;
-        }
+        if (found) return found;
       }
       return "Thalamus";
     }
 
-    // Configurar Procedencia y Restricciones de Envío
-    function setupOriginUI() {
-      roomOrigin = getRoomFromURL();
-      currentFilter = roomOrigin;
-
-      const originInput = document.getElementById('origin');
-      if (originInput) {
-        originInput.value = roomOrigin;
+    // Inicializar selectores
+    function initSelectors() {
+      const selectedRoom = getRoomFromURL();
+      const originSelect = document.getElementById('origin');
+      
+      if (originSelect) {
+        originSelect.value = selectedRoom;
       }
 
+      currentFilter = selectedRoom;
+      handleOriginChange();
+    }
+
+    // Controlar permisos de la opción "TODAS" en el destino según la procedencia elegida
+    function handleOriginChange() {
+      const originSelect = document.getElementById('origin');
       const optTodas = document.getElementById('optTodas');
       const destinySelect = document.getElementById('destiny');
 
-      // Solo Thalamus puede emitir a TODAS las salas
-      if (roomOrigin !== "Thalamus") {
+      const currentOrigin = originSelect.value;
+
+      if (currentOrigin !== "Thalamus") {
         optTodas.disabled = true;
         if (destinySelect.value === "TODAS") {
-          destinySelect.value = roomOrigin === "Scaner" ? "Thalamus" : "Scaner";
+          destinySelect.value = currentOrigin === "Scaner" ? "Thalamus" : "Scaner";
         }
       } else {
         optTodas.disabled = false;
@@ -479,7 +483,7 @@
       document.getElementById('urgency').value = urgency;
     }
 
-    // Configuración WebSocket
+    // Escucha de WebSocket
     channel
       .on('broadcast', { event: 'nuevo-aviso' }, ({ payload }) => {
         notices.unshift(...payload.newNotices);
@@ -514,6 +518,7 @@
       });
 
     function sendNoticeRemote() {
+      const roomOrigin = document.getElementById('origin').value;
       const destiny = document.getElementById('destiny').value;
       const message = document.getElementById('message').value;
       const urgency = document.getElementById('urgency').value;
@@ -554,6 +559,7 @@
     }
 
     function sendBuzzRemote() {
+      const roomOrigin = document.getElementById('origin').value;
       const destiny = document.getElementById('destiny').value;
 
       if (destiny === "TODAS" && roomOrigin !== "Thalamus") {
@@ -690,9 +696,9 @@
       }).join('');
     }
 
-    // Ejecución inicial segura
+    // Inicialización al cargar la página
     window.addEventListener('DOMContentLoaded', () => {
-      setupOriginUI();
+      initSelectors();
       initChannels();
       renderNotices();
     });
