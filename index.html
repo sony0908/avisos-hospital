@@ -252,6 +252,7 @@
         <label for="destiny">Sala / Destino</label>
         <select id="destiny">
           <option value="TODAS">⚠️ Enviar a TODAS las salas</option>
+          <option value="Thalamus">Thalamus</option>
           <option value="Scaner">Scaner</option>
           <option value="Rayos 3">Rayos 3</option>
           <option value="Rayos 4">Rayos 4</option>
@@ -301,27 +302,26 @@
   <script>
     // -------------------------------------------------------------
     // CONFIGURACIÓN DE SUPABASE
-    // Reemplaza estas dos constantes con tus credenciales de Supabase
+    // Reemplaza estas dos constantes con tus datos reales de Supabase
     // -------------------------------------------------------------
-    const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/rest/v1/";
+    const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/rest/v1/"; 
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
-
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const channel = supabaseClient.channel('canal-avisos-hospital');
 
-    // Configuración de salas
-    const channels = ["Todas", "Scaner", "Rayos 3", "Rayos 4", "Rayos 5", "Eco 3"];
+    // Configuración exacta de salas (Incluyendo Thalamus)
+    const channels = ["Todas", "Thalamus", "Scaner", "Rayos 3", "Rayos 4", "Rayos 5", "Eco 3"];
     let currentFilter = "Todas";
     let notices = [];
 
-    // Detectar si la URL incluye una sala predefinida (ej. ?sala=Rayos 3)
+    // Detectar si la URL incluye una sala predefinida (ej. ?sala=Thalamus o ?sala=Rayos 3)
     const urlParams = new URLSearchParams(window.location.search);
     const urlSala = urlParams.get('sala');
     if (urlSala && channels.includes(urlSala)) {
       currentFilter = urlSala;
     }
 
-    // Inicializar canales de la UI
+    // Inicializar la barra superior de pestañas/canales
     function initChannels() {
       const bar = document.getElementById('channelBar');
       bar.innerHTML = channels.map(ch => `
@@ -346,7 +346,7 @@
     // COMUNICACIÓN EN TIEMPO REAL (WEBSOCKETS)
     // -------------------------------------------------------------
 
-    // Unirse al canal WebSocket
+    // Escuchar eventos en tiempo real
     channel
       .on('broadcast', { event: 'nuevo-aviso' }, ({ payload }) => {
         notices.unshift(...payload.newNotices);
@@ -368,7 +368,7 @@
         }
       });
 
-    // Función para emitir aviso
+    // Función para transmitir aviso a todas las pantallas
     function sendNoticeRemote() {
       const destiny = document.getElementById('destiny').value;
       const message = document.getElementById('message').value;
@@ -394,12 +394,12 @@
         timeStr
       }));
 
-      // Agregar localmente
+      // Agregar localmente en el emisor
       notices.unshift(...newNotices);
       playAlertSound(urgency);
       renderNotices();
 
-      // Transmitir a todas las otras pantallas
+      // Transmitir a todas las otras pantallas de las salas
       channel.send({
         type: 'broadcast',
         event: 'nuevo-aviso',
@@ -409,12 +409,12 @@
       document.getElementById('message').value = '';
     }
 
-    // Función para borrar aviso
+    // Función para borrar aviso en todas las pantallas
     function removeNotice(id) {
       notices = notices.filter(n => n.id !== id);
       renderNotices();
 
-      // Notificar a las demás pantallas para que también lo borren
+      // Notificar a las demás pantallas para que lo eliminen en tiempo real
       channel.send({
         type: 'broadcast',
         event: 'borrar-aviso',
