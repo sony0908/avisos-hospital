@@ -109,6 +109,14 @@
       font-size: 0.95rem;
     }
 
+    /* Input bloqueado/deshabilitado para la procedencia */
+    input[readonly] {
+      background-color: #e9ecef;
+      cursor: not-allowed;
+      font-weight: bold;
+      color: var(--primary);
+    }
+
     .emoji-bar {
       display: flex;
       gap: 6px;
@@ -306,15 +314,8 @@
       <h2>Nuevo Aviso</h2>
       
       <div class="form-group">
-        <label for="origin">Procedencia / De parte de:</label>
-        <select id="origin" onchange="handleOriginChange()">
-          <option value="Thalamus">Thalamus</option>
-          <option value="Scaner">Scaner</option>
-          <option value="Rayos 3">Rayos 3</option>
-          <option value="Rayos 4">Rayos 4</option>
-          <option value="Rayos 5">Rayos 5</option>
-          <option value="Eco 3">Eco 3</option>
-        </select>
+        <label for="origin">Procedencia (Fijado por URL)</label>
+        <input type="text" id="origin" readonly title="La procedencia está definida por la URL del equipo">
       </div>
 
       <div class="form-group">
@@ -391,23 +392,31 @@
     let currentFilter = "Todas";
     let notices = [];
     let audioCtx = null;
+    let roomOrigin = "Thalamus"; // Valor por defecto
 
+    // Obtener la procedencia estrictamente desde la URL (?sala=...)
     const urlParams = new URLSearchParams(window.location.search);
     const urlSala = urlParams.get('sala');
+
     if (urlSala && channels.includes(urlSala)) {
-      currentFilter = urlSala;
+      roomOrigin = urlSala;
+      currentFilter = urlSala; // Inicializa la vista en la sala correspondiente
     }
 
-    // Gestionar la opción "Enviar a TODAS las salas" según la procedencia
-    function handleOriginChange() {
-      const origin = document.getElementById('origin').value;
+    // Configurar la procedencia en la interfaz
+    function setupOriginUI() {
+      const originInput = document.getElementById('origin');
+      originInput.value = roomOrigin;
+
       const optTodas = document.getElementById('optTodas');
       const destinySelect = document.getElementById('destiny');
 
-      if (origin !== "Thalamus") {
+      // Solo Thalamus puede emitir a TODAS las salas
+      if (roomOrigin !== "Thalamus") {
         optTodas.disabled = true;
+        // Si por defecto estaba en TODAS, lo cambia a otra opción válida
         if (destinySelect.value === "TODAS") {
-          destinySelect.value = origin === "Scaner" ? "Thalamus" : "Scaner";
+          destinySelect.value = roomOrigin === "Scaner" ? "Thalamus" : "Scaner";
         }
       } else {
         optTodas.disabled = false;
@@ -495,7 +504,6 @@
       });
 
     function sendNoticeRemote() {
-      const origin = document.getElementById('origin').value;
       const destiny = document.getElementById('destiny').value;
       const message = document.getElementById('message').value;
       const urgency = document.getElementById('urgency').value;
@@ -506,7 +514,7 @@
       }
 
       // Restricción adicional por seguridad
-      if (destiny === "TODAS" && origin !== "Thalamus") {
+      if (destiny === "TODAS" && roomOrigin !== "Thalamus") {
         alert("Solo la sala Thalamus puede enviar avisos a TODAS las salas.");
         return;
       }
@@ -520,7 +528,7 @@
 
       const newNotices = targetChannels.map(ch => ({
         id: Date.now() + Math.random(),
-        origin,
+        origin: roomOrigin,
         destiny: ch,
         message,
         urgency,
@@ -537,10 +545,9 @@
     }
 
     function sendBuzzRemote() {
-      const origin = document.getElementById('origin').value;
       const destiny = document.getElementById('destiny').value;
 
-      if (destiny === "TODAS" && origin !== "Thalamus") {
+      if (destiny === "TODAS" && roomOrigin !== "Thalamus") {
         alert("Solo la sala Thalamus puede enviar zumbidos a TODAS las salas.");
         return;
       }
@@ -554,7 +561,7 @@
 
       const newNotices = targetChannels.map(ch => ({
         id: Date.now() + Math.random(),
-        origin,
+        origin: roomOrigin,
         destiny: ch,
         message: '⚡ ¡Te ha enviado un ZUMBIDO!',
         urgency: 'Zumbido',
@@ -608,7 +615,6 @@
     }
 
     function playBuzzSound() {
-      // Tono característico de zumbido
       playTone(150, 0.1, 0, 'sawtooth');
       playTone(180, 0.1, 100, 'sawtooth');
       playTone(150, 0.1, 200, 'sawtooth');
@@ -676,7 +682,7 @@
     }
 
     // Inicialización
-    handleOriginChange();
+    setupOriginUI();
     initChannels();
     renderNotices();
   </script>
