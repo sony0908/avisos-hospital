@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistema de Avisos Hospitalarios</title>
-  <!-- CDN de Supabase para cliente JS -->
+  <!-- CDN de Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root {
@@ -12,8 +12,6 @@
       --card-bg: #ffffff;
       --primary: #0056b3;
       --text: #333333;
-      
-      /* Colores por Nivel de Urgencia */
       --urg-inmediato: #d9534f;
       --urg-urgente: #f0ad4e;
       --urg-normal: #5bc0de;
@@ -30,7 +28,29 @@
     h1 {
       text-align: center;
       color: var(--primary);
+      margin-bottom: 10px;
+    }
+
+    .audio-banner {
+      background-color: #fff3cd;
+      border: 1px solid #ffeeba;
+      color: #856404;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
       margin-bottom: 20px;
+      font-weight: bold;
+    }
+
+    .audio-btn {
+      background-color: #28a745;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      margin-left: 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
     }
 
     .container {
@@ -42,9 +62,7 @@
     }
 
     @media (max-width: 900px) {
-      .container {
-        grid-template-columns: 1fr;
-      }
+      .container { grid-template-columns: 1fr; }
     }
 
     .panel {
@@ -54,9 +72,7 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
-    .form-group {
-      margin-bottom: 15px;
-    }
+    .form-group { margin-bottom: 15px; }
 
     label {
       display: block;
@@ -91,24 +107,14 @@
       text-align: left;
     }
 
-    .quick-btn:hover {
-      background-color: #dee2e6;
-    }
-
     button.send-btn {
       background-color: var(--primary);
       color: white;
       font-weight: bold;
       border: none;
       cursor: pointer;
-      transition: background 0.2s;
     }
 
-    button.send-btn:hover {
-      background-color: #003d80;
-    }
-
-    /* Status indicador de conexión */
     .status-bar {
       text-align: right;
       font-size: 0.8rem;
@@ -118,7 +124,6 @@
     .status-online { color: #28a745; }
     .status-offline { color: #dc3545; }
 
-    /* Barra de Filtro de Salas */
     .channel-bar {
       display: flex;
       gap: 10px;
@@ -135,7 +140,6 @@
       cursor: pointer;
       font-weight: bold;
       white-space: nowrap;
-      transition: all 0.2s;
     }
 
     .channel-tab.active {
@@ -143,7 +147,6 @@
       color: white;
     }
 
-    /* Rejilla de Avisos */
     .alerts-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -157,7 +160,6 @@
       border-radius: 8px;
       box-shadow: 0 2px 4px rgba(0,0,0,0.08);
       position: relative;
-      animation: fadeIn 0.3s ease-in-out;
     }
 
     .alert-card.inmediato {
@@ -202,20 +204,6 @@
     .urgency-badge.urgente { background-color: var(--urg-urgente); }
     .urgency-badge.no-tan-urgente { background-color: var(--urg-normal); }
 
-    .alert-info p {
-      margin: 5px 0 0 0;
-      color: #2d3748;
-      font-size: 1rem;
-      line-height: 1.4;
-    }
-
-    .alert-time {
-      margin-top: 12px;
-      font-size: 0.75rem;
-      color: #718096;
-      text-align: right;
-    }
-
     .close-btn {
       position: absolute;
       top: 10px;
@@ -228,20 +216,17 @@
       width: auto;
       padding: 0;
     }
-
-    .close-btn:hover {
-      color: var(--urg-inmediato);
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
   </style>
 </head>
 <body>
 
   <h1>Centro de Avisos Hospitalarios</h1>
+
+  <!-- Banner para Habilitar Permisos de Sonido y Ventanas Emergentes -->
+  <div class="audio-banner" id="permBanner">
+    🔔 Para escuchar las alarmas sonoras y recibir ventanas emergentes:
+    <button class="audio-btn" onclick="enablePermissions()">Activar Alertas Visuales y Sonoras</button>
+  </div>
 
   <div class="container">
     <!-- Panel Emisor -->
@@ -264,9 +249,9 @@
       <div class="form-group">
         <label for="urgency">Nivel de Urgencia</label>
         <select id="urgency">
-          <option value="Inmediato">🔴 Inmediato</option>
-          <option value="Urgente" selected>🟡 Urgente</option>
-          <option value="No tan urgente">🔵 No tan urgente</option>
+          <option value="Inmediato">🔴 Inmediato (Alarma Doble)</option>
+          <option value="Urgente" selected>🟡 Urgente (Alarma Simple)</option>
+          <option value="No tan urgente">🔵 No tan urgente (Aviso Suave)</option>
         </select>
       </div>
 
@@ -286,47 +271,59 @@
       <button class="send-btn" onclick="sendNoticeRemote()">Enviar Aviso</button>
     </div>
 
-    <!-- Tablero Receptor Multicanal -->
+    <!-- Tablero Receptor -->
     <div class="panel">
       <div class="status-bar">
         Estado Red: <span id="connectionStatus" class="status-offline">Conectando...</span>
       </div>
 
-      <!-- Filtro de Salas -->
       <div class="channel-bar" id="channelBar"></div>
-
       <div id="alertsContainer" class="alerts-grid"></div>
     </div>
   </div>
 
   <script>
-    // -------------------------------------------------------------
-    // CONFIGURACIÓN DE SUPABASE
-    // Reemplaza estas dos constantes con tus datos reales de Supabase
-    // -------------------------------------------------------------
-    const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/"; 
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/"; 
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
 
-// Se configura el canal permitiendo broadcast público de auto-envío (self: true)
-const channel = supabaseClient.channel('canal-avisos-hospital', {
-  config: {
-    broadcast: { self: true }
-  }
-});
-    // Configuración exacta de salas (Incluyendo Thalamus)
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const channel = supabaseClient.channel('canal-avisos-hospital', {
+      config: { broadcast: { self: true } }
+    });
+
     const channels = ["Todas", "Thalamus", "Scaner", "Rayos 3", "Rayos 4", "Rayos 5", "Eco 3"];
     let currentFilter = "Todas";
     let notices = [];
+    let audioCtx = null;
 
-    // Detectar si la URL incluye una sala predefinida (ej. ?sala=Thalamus o ?sala=Rayos 3)
     const urlParams = new URLSearchParams(window.location.search);
     const urlSala = urlParams.get('sala');
     if (urlSala && channels.includes(urlSala)) {
       currentFilter = urlSala;
     }
 
-    // Inicializar la barra superior de pestañas/canales
+    // Solicitud de Permisos
+    function enablePermissions() {
+      // 1. Audio Context
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      // 2. Notificaciones Emergentes
+      if ("Notification" in window) {
+        Notification.requestPermission().then(permission => {
+          if (permission === "granted") {
+            document.getElementById('permBanner').style.display = 'none';
+          }
+        });
+      } else {
+        document.getElementById('permBanner').style.display = 'none';
+      }
+    }
+
     function initChannels() {
       const bar = document.getElementById('channelBar');
       bar.innerHTML = channels.map(ch => `
@@ -347,15 +344,19 @@ const channel = supabaseClient.channel('canal-avisos-hospital', {
       document.getElementById('urgency').value = urgency;
     }
 
-    // -------------------------------------------------------------
-    // COMUNICACIÓN EN TIEMPO REAL (WEBSOCKETS)
-    // -------------------------------------------------------------
-
-    // Escuchar eventos en tiempo real
+    // Configurar Escucha de WebSocket
     channel
       .on('broadcast', { event: 'nuevo-aviso' }, ({ payload }) => {
         notices.unshift(...payload.newNotices);
-        playAlertSound(payload.urgency);
+        
+        // Verificar si el aviso pertenece a la sala abierta actualmente
+        const belongsToRoom = payload.newNotices.some(n => n.destiny === currentFilter || currentFilter === "Todas");
+        
+        if (belongsToRoom) {
+          playAlarmSound(payload.urgency);
+          showPopUpNotification(payload.newNotices[0]);
+        }
+        
         renderNotices();
       })
       .on('broadcast', { event: 'borrar-aviso' }, ({ payload }) => {
@@ -373,7 +374,6 @@ const channel = supabaseClient.channel('canal-avisos-hospital', {
         }
       });
 
-    // Función para transmitir aviso a todas las pantallas
     function sendNoticeRemote() {
       const destiny = document.getElementById('destiny').value;
       const message = document.getElementById('message').value;
@@ -399,12 +399,6 @@ const channel = supabaseClient.channel('canal-avisos-hospital', {
         timeStr
       }));
 
-      // Agregar localmente en el emisor
-      notices.unshift(...newNotices);
-      playAlertSound(urgency);
-      renderNotices();
-
-      // Transmitir a todas las otras pantallas de las salas
       channel.send({
         type: 'broadcast',
         event: 'nuevo-aviso',
@@ -414,12 +408,10 @@ const channel = supabaseClient.channel('canal-avisos-hospital', {
       document.getElementById('message').value = '';
     }
 
-    // Función para borrar aviso en todas las pantallas
     function removeNotice(id) {
       notices = notices.filter(n => n.id !== id);
       renderNotices();
 
-      // Notificar a las demás pantallas para que lo eliminen en tiempo real
       channel.send({
         type: 'broadcast',
         event: 'borrar-aviso',
@@ -427,33 +419,57 @@ const channel = supabaseClient.channel('canal-avisos-hospital', {
       });
     }
 
-    // -------------------------------------------------------------
-    // RENDERIZADO Y SONIDO
-    // -------------------------------------------------------------
+    // --- ALARMAS Y NOTIFICACIONES EMERGENTES ---
 
-    function playAlertSound(urgency) {
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      
-      let freq = 600;
-      if (urgency === 'Urgente') freq = 880;
-      if (urgency === 'Inmediato') freq = 1200;
+    function playTone(freq, duration, delay = 0) {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      setTimeout(() => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      }, delay);
+    }
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-      
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      
-      osc.start();
-      osc.stop(audioCtx.currentTime + (urgency === 'Inmediato' ? 0.5 : 0.25));
+    function playAlarmSound(urgency) {
+      if (urgency === 'Inmediato') {
+        // Tono tipo sirena de emergencia (2 pitidos agudos seguidos)
+        playTone(900, 0.2, 0);
+        playTone(1200, 0.4, 250);
+        playTone(900, 0.2, 700);
+        playTone(1200, 0.4, 950);
+      } else if (urgency === 'Urgente') {
+        // Tono de atención intermedio
+        playTone(750, 0.3, 0);
+        playTone(750, 0.3, 400);
+      } else {
+        // Tono suave
+        playTone(520, 0.3, 0);
+      }
+    }
+
+    function showPopUpNotification(noticeData) {
+      if ("Notification" in window && Notification.permission === "granted") {
+        const title = `🚨 [${noticeData.urgency.toUpperCase()}] Para ${noticeData.destiny}`;
+        const options = {
+          body: noticeData.message,
+          requireInteraction: noticeData.urgency === 'Inmediato'
+        };
+        new Notification(title, options);
+      }
     }
 
     function renderNotices() {
       const container = document.getElementById('alertsContainer');
-      
       const filtered = currentFilter === "Todas" 
         ? notices 
         : notices.filter(n => n.destiny === currentFilter);
@@ -465,7 +481,6 @@ const channel = supabaseClient.channel('canal-avisos-hospital', {
 
       container.innerHTML = filtered.map(n => {
         const classUrgency = n.urgency.toLowerCase().replace(/ /g, '-');
-        
         return `
           <div class="alert-card ${classUrgency}">
             <button class="close-btn" onclick="removeNotice(${n.id})">✖</button>
@@ -476,7 +491,7 @@ const channel = supabaseClient.channel('canal-avisos-hospital', {
             <div class="alert-info">
               <p>${n.message}</p>
             </div>
-            <div class="alert-time">
+            <div style="margin-top: 12px; font-size: 0.75rem; color: #718096; text-align: right;">
               Emitido a las ${n.timeStr} hrs
             </div>
           </div>
