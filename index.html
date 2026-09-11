@@ -87,7 +87,7 @@
       <span class="material-symbols-outlined text-sm" id="theme-toggle-icon">dark_mode</span>
       <span class="hidden md:inline" id="theme-toggle-text">Lectura Nocturna</span>
     </button>
-    <button class="bg-hospital-600 hover:bg-hospital-500 text-white px-2.5 py-0.5 rounded text-[11px] font-medium transition shadow-sm flex items-center gap-1" onclick="playHospitalAlarm(3000, 'Alarma de Prueba')" type="button">
+    <button class="bg-hospital-600 hover:bg-hospital-500 text-white px-2.5 py-0.5 rounded text-[11px] font-medium transition shadow-sm flex items-center gap-1" onclick="playHospitalAlarm(3000)" type="button">
       <span class="material-symbols-outlined text-sm">volume_up</span>
       <span>Probar Audio</span>
     </button>
@@ -248,8 +248,8 @@
             <span class="hidden sm:inline">Zumbido</span>
           </button>
 
-          <!-- Botón Enviar -->
-          <button class="shrink-0 w-9 h-9 rounded-xl bg-hospital-600 hover:bg-hospital-700 active:bg-hospital-800 text-white flex items-center justify-center transition shadow-2xs active:scale-95" type="submit">
+          <!-- Botón Enviar con llamada explícita onclick -->
+          <button class="shrink-0 w-9 h-9 rounded-xl bg-hospital-600 hover:bg-hospital-700 active:bg-hospital-800 text-white flex items-center justify-center transition shadow-2xs active:scale-95" onclick="sendNoticeRemote()" type="button">
             <span class="material-symbols-outlined text-lg">send</span>
           </button>
         </div>
@@ -258,9 +258,8 @@
   </main>
 </div>
 
-<!-- Lógica JavaScript Unificada (Supabase + Estética Stitch + Alarmas exactas a 3s) -->
+<!-- Lógica JavaScript Unificada (Supabase + Alarmas exactas a 3s) -->
 <script>
-  // Credenciales Supabase originales conservadas
   const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/"; 
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
 
@@ -274,14 +273,12 @@
   let currentFilter = "Thalamus";
   let notices = [];
   
-  // Variables de Audio / Alarmas
   let audioCtx = null;
   let alarmInterval = null;
   let alarmCountdownTimer = null;
   let alarmEndTime = 0;
   let isMuted = false;
 
-  // --- TEMA OSCURO / CLARO ---
   function initTheme() {
     const savedTheme = localStorage.getItem('hospital_chat_theme');
     if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -320,7 +317,6 @@
 
   initTheme();
 
-  // --- DETECCIÓN DE SALA DESDE URL ---
   function getRoomFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const rawSala = urlParams.get('sala') || urlParams.get('Sala');
@@ -361,14 +357,15 @@
     const bar = document.getElementById('channelBar');
     bar.innerHTML = channels.map(ch => {
       const isActive = ch === currentFilter;
+      // Estilos ajustados para asegurar alto contraste en MODO OSCURO
       const activeClasses = isActive 
-        ? 'bg-hospital-50/90 dark:bg-hospital-950/50 text-hospital-900 dark:text-sky-200 border border-hospital-200 dark:border-hospital-800/80 shadow-2xs font-bold'
+        ? 'bg-hospital-50 dark:bg-hospital-900 text-hospital-900 dark:text-sky-100 border border-hospital-200 dark:border-hospital-700 shadow-2xs font-bold'
         : 'hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300 font-semibold';
       
       return `
         <button class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left transition ${activeClasses}" onclick="filterChannel('${ch}')" type="button">
           <div class="flex items-center gap-2.5 min-w-0">
-            <span class="w-8 h-8 rounded-lg ${isActive ? 'bg-hospital-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'} flex items-center justify-center shrink-0 text-sm">
+            <span class="w-8 h-8 rounded-lg ${isActive ? 'bg-hospital-600 dark:bg-hospital-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'} flex items-center justify-center shrink-0 text-sm">
               ${ch === 'Todas' ? '🔔' : '🏥'}
             </span>
             <div class="truncate">
@@ -387,7 +384,6 @@
     renderNotices();
   }
 
-  // --- AUDIO Y ALARMAS (Corte exacto 3s) ---
   function getAudioContext() {
     if (!audioCtx) {
       const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
@@ -458,7 +454,6 @@
     playHospitalAlarm(3000);
   }
 
-  // --- SUPABASE CONEXIÓN Y EVENTOS ---
   channelSupabase
     .on('broadcast', { event: 'nuevo-aviso' }, ({ payload }) => {
       notices.unshift(...payload.newNotices);
@@ -490,11 +485,11 @@
       }
     });
 
-  // --- ACCIONES DE ENVÍO Y UI ---
   function sendNoticeRemote() {
     const roomOrigin = document.getElementById('terminal-select').value;
     const destiny = document.getElementById('destiny').value;
-    const message = document.getElementById('message').value;
+    const messageInput = document.getElementById('message');
+    const message = messageInput.value;
     const urgency = document.getElementById('urgency').value;
 
     if (!message.trim()) {
@@ -526,7 +521,7 @@
       payload: { newNotices, urgency }
     });
 
-    document.getElementById('message').value = '';
+    messageInput.value = '';
   }
 
   function sendBuzzRemote() {
@@ -621,12 +616,12 @@
             <div class="flex items-center gap-2 mb-1">
               <span class="text-xs font-bold text-slate-800 dark:text-slate-200">${n.origin}</span>
               <span class="text-[10px] text-slate-400">${n.timeStr}</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isImmediate ? 'bg-rose-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600'}">${n.urgency}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isImmediate ? 'bg-rose-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}">${n.urgency}</span>
             </div>
             <div class="${cardBg} rounded-2xl rounded-tl-sm p-3.5 shadow-2xs relative">
               <div class="flex items-start justify-between gap-4">
                 <p class="text-sm text-slate-800 dark:text-slate-100 font-medium">${n.message}</p>
-                <button type="button" onclick="removeNotice(${n.id})" class="text-slate-400 hover:text-slate-700 transition"><span class="material-symbols-outlined text-base">close</span></button>
+                <button type="button" onclick="removeNotice(${n.id})" class="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition"><span class="material-symbols-outlined text-base">close</span></button>
               </div>
             </div>
           </div>
