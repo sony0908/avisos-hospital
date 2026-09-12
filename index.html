@@ -101,8 +101,8 @@
   <aside class="w-72 lg:w-80 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col shrink-0 overflow-hidden transition-colors">
     <div class="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <!-- BOTÓN SECRETO: 3 clics abre el minijuego -->
-        <div onclick="handleSecretClick()" class="w-9 h-9 rounded-xl bg-hospital-600 flex items-center justify-center text-white shadow-sm shadow-hospital-600/30 cursor-pointer select-none active:scale-95 transition-transform" title="Sistema Clínico Imagenología">
+        <!-- BOTÓN SECRETO: 3 clics o CTRL+SHIFT+K abre el minijuego -->
+        <div id="secret-btn" onclick="handleSecretClick()" class="w-9 h-9 rounded-xl bg-hospital-600 flex items-center justify-center text-white shadow-sm shadow-hospital-600/30 cursor-pointer select-none active:scale-95 transition-transform" title="Sistema Clínico Imagenología">
           <span class="material-symbols-outlined text-xl">local_hospital</span>
         </div>
         <div>
@@ -129,10 +129,8 @@
       </div>
     </div>
 
-    <!-- Canales / Salas (Barra lateral dinámica) -->
-    <div class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5" id="channelBar">
-      <!-- Se inyecta dinámicamente mediante JS para matchear con Supabase -->
-    </div>
+    <!-- Canales / Salas -->
+    <div class="flex-1 overflow-y-auto px-2 py-3 space-y-0.5" id="channelBar"></div>
 
     <!-- Footer Sidebar -->
     <div class="p-3 bg-slate-50 dark:bg-slate-800/70 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs gap-1">
@@ -174,19 +172,17 @@
       </div>
     </div>
 
-    <!-- Timeline de Mensajes / Alertas -->
+    <!-- Timeline de Mensajes -->
     <div class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/40 dark:bg-slate-950/40" id="chat-stream">
       <div class="flex items-center justify-center my-2">
         <span class="bg-slate-200/70 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[11px] font-medium px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700/60">
           Canal Activo • En espera de eventos
         </span>
       </div>
-      <div id="alertsContainer" class="space-y-3">
-        <!-- Las alertas de Supabase se renderizan aquí dinámicamente -->
-      </div>
+      <div id="alertsContainer" class="space-y-3"></div>
     </div>
 
-    <!-- 3. COMPACT CHAT COMPOSER (Pie de página para enviar avisos) -->
+    <!-- 3. COMPACT CHAT COMPOSER -->
     <footer class="p-3 md:p-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 shrink-0 space-y-2.5 transition-colors">
       
       <!-- Plantillas Rápidas -->
@@ -212,11 +208,10 @@
         </button>
       </div>
 
-      <!-- Formulario de envío -->
+      <!-- Formulario -->
       <form class="bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-2 focus-within:border-hospital-500 focus-within:ring-2 focus-within:ring-hospital-100 dark:focus-within:ring-hospital-900/50 transition-all shadow-2xs" onsubmit="event.preventDefault(); sendNoticeRemote();">
         <div class="flex items-center gap-2">
           
-          <!-- Emoji bar popup toggle -->
           <div class="relative flex items-center">
             <button class="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" onclick="toggleEmojiBar()" type="button" title="Insertar emoji">
               <span class="material-symbols-outlined text-lg">mood</span>
@@ -230,7 +225,6 @@
             </div>
           </div>
 
-          <!-- Selector Sala Destino -->
           <div class="shrink-0">
             <select class="text-xs font-semibold py-1.5 pl-2 pr-6 rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:border-hospital-500 shadow-2xs" id="destiny">
               <option value="TODAS" id="optTodas">⚠️ TODAS las salas</option>
@@ -243,7 +237,6 @@
             </select>
           </div>
 
-          <!-- Selector Urgencia -->
           <div class="shrink-0">
             <select class="text-xs font-semibold py-1.5 pl-2 pr-6 rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 focus:border-hospital-500 shadow-2xs" id="urgency">
               <option value="Inmediato">🔴 Inmediato (Alarma 3s)</option>
@@ -252,16 +245,13 @@
             </select>
           </div>
 
-          <!-- Input de texto -->
           <input autocomplete="off" class="flex-1 bg-transparent border-0 text-sm placeholder:text-slate-400 focus:ring-0 text-slate-800 dark:text-slate-100 font-medium py-1.5 px-2" id="message" placeholder="Escribe un aviso clínico..." type="text">
 
-          <!-- Botón Zumbido -->
           <button class="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-purple-100 hover:bg-purple-200 dark:bg-purple-900/60 dark:text-purple-200 text-purple-800 text-xs font-bold transition shadow-2xs active:scale-95" onclick="sendBuzzRemote()" type="button" title="Enviar Zumbido Inter-Salas">
             <span>⚡</span>
             <span class="hidden sm:inline">Zumbido</span>
           </button>
 
-          <!-- Botón Enviar -->
           <button class="shrink-0 w-9 h-9 rounded-xl bg-hospital-600 hover:bg-hospital-700 active:bg-hospital-800 text-white flex items-center justify-center transition shadow-2xs active:scale-95" onclick="sendNoticeRemote()" type="button">
             <span class="material-symbols-outlined text-lg">send</span>
           </button>
@@ -271,61 +261,62 @@
   </main>
 </div>
 
-<!-- MODAL RECREATIVO ESCONDIDO (SNAKE CLINICO + TABLA DE POSICIONES) -->
-<div id="game-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl text-slate-100 flex flex-col md:flex-row">
+<!-- VENTANA MODAL RECREATIVA SECRETA -->
+<div id="game-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl overflow-hidden shadow-2xl text-slate-100 flex flex-col md:flex-row">
     
-    <!-- Area del Juego -->
-    <div class="p-4 flex-1 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800 relative">
+    <!-- Zona del Juego Canvas -->
+    <div class="p-5 flex-1 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-800 relative bg-slate-950/50">
       <div class="flex items-center justify-between w-full mb-3">
         <div class="flex items-center gap-2">
-          <span class="text-lg">🐍</span>
-          <h3 class="text-sm font-bold tracking-wide text-emerald-400">Snake Médico</h3>
+          <span class="text-xl">🐍</span>
+          <h3 class="text-xs font-bold tracking-wider uppercase text-emerald-400">Turno Relax - Snake</h3>
         </div>
-        <span class="text-xs bg-slate-800 px-2.5 py-1 rounded-full font-mono text-amber-400" id="game-score">Puntos: 0</span>
+        <span class="text-xs bg-slate-800 border border-slate-700 px-3 py-1 rounded-full font-mono text-amber-300 font-bold" id="game-score">Score: 0</span>
       </div>
 
-      <canvas id="snakeCanvas" width="300" height="300" class="bg-slate-950 border border-slate-800 rounded-lg shadow-inner"></canvas>
+      <canvas id="snakeCanvas" width="300" height="300" class="bg-slate-950 border-2 border-slate-800 rounded-xl shadow-inner"></canvas>
       
-      <p class="text-[10px] text-slate-400 mt-2 text-center">Usa las teclas de **Flechas** para moverte</p>
+      <p class="text-[10px] text-slate-400 mt-3 text-center">Usa las <b>Flechas del Teclado</b> para dirigir la serpiente</p>
       
-      <!-- Overlays del Juego -->
-      <div id="game-overlay-start" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-4 text-center">
-        <p class="text-xs text-slate-300 mb-3">¡Bienvenido al descanso de turno!</p>
-        <button onclick="startGame()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-lg">Comenzar Juego</button>
+      <!-- Overlay Inicio -->
+      <div id="game-overlay-start" class="absolute inset-0 bg-slate-950/90 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center z-10">
+        <div class="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center mb-3 text-2xl border border-emerald-500/30">🐍</div>
+        <h4 class="text-sm font-bold text-white mb-1">¡Mini Juego Desbloqueado!</h4>
+        <p class="text-xs text-slate-400 mb-4 max-w-xs">Acumula puntos para posicionar a tu Sala en el Ránking General.</p>
+        <button onclick="startGame()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-lg active:scale-95">Jugar Ahora</button>
       </div>
 
-      <div id="game-overlay-over" class="absolute inset-0 bg-slate-950/90 hidden flex flex-col items-center justify-center p-4 text-center">
-        <h4 class="text-rose-500 font-bold text-sm mb-1">¡FIN DEL JUEGO!</h4>
-        <p class="text-xs text-slate-300 mb-3" id="final-score-text">Puntaje: 0</p>
-        <button onclick="startGame()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-lg mb-2">Reintentar</button>
+      <!-- Overlay Game Over -->
+      <div id="game-overlay-over" class="absolute inset-0 bg-slate-950/90 backdrop-blur-xs hidden flex flex-col items-center justify-center p-4 text-center z-10">
+        <div class="w-12 h-12 bg-rose-500/20 text-rose-400 rounded-2xl flex items-center justify-center mb-2 text-2xl border border-rose-500/30">💥</div>
+        <h4 class="text-rose-400 font-bold text-sm mb-1">¡Fin de la Partida!</h4>
+        <p class="text-xs text-slate-300 mb-4" id="final-score-text font-mono">Puntaje final: 0</p>
+        <button onclick="startGame()" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition shadow-lg active:scale-95">Reintentar</button>
       </div>
     </div>
 
-    <!-- Tabla de Posiciones por Salas -->
-    <div class="w-full md:w-64 p-4 bg-slate-900/50 flex flex-col justify-between">
+    <!-- Tabla Ránking por Sala -->
+    <div class="w-full md:w-60 p-4 bg-slate-900 flex flex-col justify-between">
       <div>
-        <div class="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1">
-            <span>🏆</span> Ránking Por Sala
+        <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-2">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+            <span>🏆</span> Ránking Salas
           </h4>
-          <button onclick="closeGameModal()" class="text-slate-400 hover:text-white transition">
-            <span class="material-symbols-outlined text-sm">close</span>
+          <button onclick="closeGameModal()" class="text-slate-400 hover:text-white transition p-1 rounded-lg hover:bg-slate-800">
+            <span class="material-symbols-outlined text-base">close</span>
           </button>
         </div>
-        <div class="space-y-2 text-xs" id="leaderboard-list">
-          <!-- Ránking dinámico aquí -->
-        </div>
+        <div class="space-y-1.5 text-xs" id="leaderboard-list"></div>
       </div>
       <div class="pt-4 border-t border-slate-800 text-[10px] text-slate-500 text-center">
-        Premio al mejor puntaje del turno ☕
+        Puntaje guardado por tu Terminal actual.
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- Lógica JavaScript Unificada (Supabase + Alarmas + Minijuego Secreto) -->
 <script>
   const SUPABASE_URL = "https://uojtlxrzzsaxsurbxxhi.supabase.co/"; 
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVvanRseHJ6enNheHN1cmJ4eGhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NTc2MjAsImV4cCI6MjEwNDUzMzYyMH0.kkvFCgw8u90TDyd7YD9PssifTy0ahpQedEp52whZ644";
@@ -700,16 +691,16 @@
     }).join('');
   }
 
-  /* ===================================================
-     LÓGICA DEL MINIJUEGO ESCONDIDO (SNAKE + PUNTAJES)
-     =================================================== */
+  /* ====================================================
+     LÓGICA CORREGIDA DEL MINIJUEGO SECRETO (SNAKE)
+     ==================================================== */
   let secretClickCount = 0;
   let secretClickTimer = null;
 
   function handleSecretClick() {
     secretClickCount++;
     clearTimeout(secretClickTimer);
-    secretClickTimer = setTimeout(() => { secretClickCount = 0; }, 1200);
+    secretClickTimer = setTimeout(() => { secretClickCount = 0; }, 1000);
 
     if (secretClickCount >= 3) {
       secretClickCount = 0;
@@ -717,40 +708,49 @@
     }
   }
 
+  // Atajo opcional por teclado: CTRL + SHIFT + K
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'k') {
+      e.preventDefault();
+      openGameModal();
+    }
+  });
+
   let leaderboardData = {
     'Thalamus': 0, 'Scaner': 0, 'Rayos 3': 0, 'Rayos 4': 0, 'Rayos 5': 0, 'Eco 3': 0
   };
 
   function openGameModal() {
-    document.getElementById('game-modal').classList.remove('hidden');
+    const modal = document.getElementById('game-modal');
+    modal.classList.remove('hidden');
     updateLeaderboardUI();
-    document.addEventListener('keydown', changeDirection);
+    document.addEventListener('keydown', handleGameKeys);
   }
 
   function closeGameModal() {
-    document.getElementById('game-modal').classList.add('hidden');
+    const modal = document.getElementById('game-modal');
+    modal.classList.add('hidden');
     clearInterval(gameLoopInterval);
-    document.removeEventListener('keydown', changeDirection);
+    document.removeEventListener('keydown', handleGameKeys);
   }
 
   function updateLeaderboardUI() {
     const list = document.getElementById('leaderboard-list');
     const sorted = Object.entries(leaderboardData).sort((a, b) => b[1] - a[1]);
     list.innerHTML = sorted.map(([room, score], idx) => `
-      <div class="flex items-center justify-between p-2 rounded bg-slate-800/60 border border-slate-700/50">
-        <span class="font-medium text-slate-300 flex items-center gap-1.5">
-          <span class="text-[10px] text-amber-400 font-mono w-3">${idx + 1}.</span> ${room}
+      <div class="flex items-center justify-between p-2 rounded bg-slate-800/80 border border-slate-700/60">
+        <span class="font-medium text-slate-200 flex items-center gap-1.5 truncate">
+          <span class="text-[10px] text-amber-400 font-mono font-bold">${idx + 1}.</span> ${room}
         </span>
         <span class="font-mono text-emerald-400 font-bold">${score} pts</span>
       </div>
     `).join('');
   }
 
-  // Motor Snake
+  // Motor del juego
   const canvas = document.getElementById('snakeCanvas');
   const ctx = canvas.getContext('2d');
   const gridSize = 15;
-  const tileCount = 20;
   let snake = [];
   let food = { x: 0, y: 0 };
   let dx = gridSize, dy = 0;
@@ -766,12 +766,12 @@
     score = 0;
     dx = gridSize;
     dy = 0;
-    document.getElementById('game-score').textContent = `Puntos: ${score}`;
+    document.getElementById('game-score').textContent = `Score: ${score}`;
     document.getElementById('game-overlay-start').classList.add('hidden');
     document.getElementById('game-overlay-over').classList.add('hidden');
     generateFood();
     clearInterval(gameLoopInterval);
-    gameLoopInterval = setInterval(gameLoop, 110);
+    gameLoopInterval = setInterval(gameLoop, 100);
   }
 
   function gameLoop() {
@@ -788,7 +788,7 @@
     snake.unshift(head);
     if (head.x === food.x && head.y === food.y) {
       score += 10;
-      document.getElementById('game-score').textContent = `Puntos: ${score}`;
+      document.getElementById('game-score').textContent = `Score: ${score}`;
       generateFood();
     } else {
       snake.pop();
@@ -796,8 +796,8 @@
   }
 
   function generateFood() {
-    food.x = Math.floor(Math.random() * tileCount) * gridSize;
-    food.y = Math.floor(Math.random() * tileCount) * gridSize;
+    food.x = Math.floor(Math.random() * (canvas.width / gridSize)) * gridSize;
+    food.y = Math.floor(Math.random() * (canvas.height / gridSize)) * gridSize;
   }
 
   function checkCollision() {
@@ -830,26 +830,31 @@
     ctx.fillStyle = '#020617';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Dibuja alimento
+    // Comida
     ctx.fillStyle = '#f43f5e';
     ctx.beginPath();
     ctx.arc(food.x + gridSize/2, food.y + gridSize/2, gridSize/2 - 1, 0, Math.PI * 2);
     ctx.fill();
 
-    // Dibuja serpiente
+    // Serpiente
     snake.forEach((part, index) => {
       ctx.fillStyle = index === 0 ? '#10b981' : '#34d399';
       ctx.fillRect(part.x, part.y, gridSize - 1, gridSize - 1);
     });
   }
 
-  function changeDirection(e) {
-    if (document.getElementById('game-modal').classList.contains('hidden')) return;
-    const LEFT = 37, UP = 38, RIGHT = 39, DOWN = 40;
-    if (e.keyCode === LEFT && dx === 0) { dx = -gridSize; dy = 0; }
-    if (e.keyCode === UP && dy === 0) { dx = 0; dy = -gridSize; }
-    if (e.keyCode === RIGHT && dx === 0) { dx = gridSize; dy = 0; }
-    if (e.keyCode === DOWN && dy === 0) { dx = 0; dy = gridSize; }
+  function handleGameKeys(e) {
+    const isModalOpen = !document.getElementById('game-modal').classList.contains('hidden');
+    if (!isModalOpen) return;
+
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.preventDefault(); // Evita desplazamientos de pantalla
+    }
+
+    if (e.key === "ArrowLeft" && dx === 0) { dx = -gridSize; dy = 0; }
+    if (e.key === "ArrowUp" && dy === 0) { dx = 0; dy = -gridSize; }
+    if (e.key === "ArrowRight" && dx === 0) { dx = gridSize; dy = 0; }
+    if (e.key === "ArrowDown" && dy === 0) { dx = 0; dy = gridSize; }
   }
 
   window.addEventListener('DOMContentLoaded', () => {
