@@ -2,7 +2,7 @@
   'use strict';
   const config = window.APP_CONFIG || {};
   const $ = (selector) => document.querySelector(selector);
-  const state = { client: null, terminal: null, rooms: [], notices: [], acknowledgements: new Set(), channel: null, sound: false, audio: null, refreshTimer: null, pairingCode: null, pairingTimer: null, pairingRefreshTimer: null };
+  const state = { client: null, terminal: null, rooms: [], notices: [], acknowledgements: new Set(), channel: null, sound: false, audio: null, refreshTimer: null, pairingCode: null, pairingTimer: null, pairingRefreshTimer: null, terminalWatchTimer: null };
   const el = {
     shell: $('#app-shell'), activation: $('#activation-modal'), activationError: $('#activation-error'), pairingQr: $('#pairing-qr'), pairingExpiry: $('#pairing-expiry'), pairingRefresh: $('#pairing-refresh'),
     room: $('#terminal-room'), terminalLabel: $('#terminal-label'), title: $('#terminal-title'), description: $('#room-description'), destination: $('#notice-destination'), message: $('#notice-message'), priority: $('#notice-priority'), form: $('#notice-form'), send: $('#send-button'), list: $('#notice-list'),
@@ -70,6 +70,19 @@
       } catch (error) { console.error(error); }
     }, 3000);
   }
+  function startTerminalWatch() {
+    if (state.terminalWatchTimer) return;
+    state.terminalWatchTimer = setInterval(async () => {
+      try {
+        const { data, error } = await state.client.rpc('my_terminal_context');
+        if (error) throw error;
+        if (state.terminal && !data?.[0]) {
+          state.channel?.unsubscribe(); state.channel = null; state.terminal = null;
+          await boot();
+        }
+      } catch (error) { console.error(error); }
+    }, 15000);
+  }
   async function requestPairing() {
     el.pairingRefresh.disabled = true; activationError(); el.pairingExpiry.textContent = 'Generando QR seguro…';
     try {
@@ -87,7 +100,7 @@
   async function terminal() {
     const { data, error } = await state.client.rpc('my_terminal_context'); if (error) throw error; state.terminal = data?.[0] || null;
     if (!state.terminal) { el.activation.classList.remove('hidden'); el.shell.classList.add('hidden'); setConnection('Terminal pendiente de asignación', 'offline'); if (!state.pairingCode) await requestPairing(); return false; }
-    stopPairingMonitor();
+    stopPairingMonitor(); startTerminalWatch();
     el.activation.classList.add('hidden'); el.shell.classList.remove('hidden'); el.room.textContent = state.terminal.room_name; el.terminalLabel.textContent = state.terminal.terminal_label || `Terminal ${state.terminal.room_code}`; el.title.textContent = `Canal: ${state.terminal.room_name}`; el.description.textContent = `Enviando como ${state.terminal.room_name}. Los avisos quedan registrados.`; return true;
   }
   async function rooms() {

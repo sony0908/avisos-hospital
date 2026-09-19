@@ -31,9 +31,9 @@ Se requiere acceso de administrador al proyecto Supabase; los computadores clín
 2. Desde un teléfono o PC de administración, abre `master.html` en el mismo sitio publicado e inicia sesión con el correo autorizado.
 3. Escanea el QR, elige la sala y confirma. El computador se activa automáticamente sin copiar claves.
 
-La consola maestra autorizada es `ericksong4b2016@gmail.com`. Puede monitorear los avisos de todas las salas y enviar como la sala seleccionada. El QR contiene solo un código temporal de un uso; nunca expone la sesión del navegador de sala.
+La consola maestra autorizada es `ericksong4b2016@gmail.com`. Puede monitorear los avisos de todas las salas, enviar como la sala seleccionada y mostrar los **terminales vinculados**. El QR contiene solo un código temporal de un uso; nunca expone la sesión del navegador de sala.
 
-Para desactivar un computador perdido, reemplazado o que se usó indebidamente, localízalo por etiqueta y revócalo:
+Para desactivar un computador perdido, reemplazado o que se usó indebidamente, usa **Desvincular** desde la consola maestra. El equipo pierde acceso en segundos y, si se vuelve a abrir, pedirá un QR nuevo. Como alternativa administrativa, localízalo por etiqueta y revócalo:
 
 ```sql
 update public.terminals

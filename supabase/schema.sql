@@ -264,6 +264,25 @@ begin
 end;
 $$;
 
+-- Revoca el acceso del navegador sin borrar su historial ni los avisos.
+-- Si se vuelve a usar ese PC, la página mostrará otro QR para asignarlo de nuevo.
+create or replace function public.deactivate_terminal(p_terminal_id uuid)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.is_master_operator() then
+    raise exception 'Solo un operador maestro puede desvincular terminales';
+  end if;
+
+  update public.terminals
+  set active = false, deactivated_at = now()
+  where id = p_terminal_id and active = true;
+
+  if not found then
+    raise exception 'El terminal ya estaba desvinculado o no existe';
+  end if;
+end;
+$$;
+
 create or replace function public.create_notice(p_destination_code text, p_body text, p_priority text)
 returns uuid language plpgsql security definer set search_path = public as $$
 declare v_terminal uuid := public.current_terminal_id(); v_source_room uuid; v_source_code text;
@@ -363,8 +382,8 @@ revoke all on function public.activate_terminal(text) from public, anon;
 revoke all on function public.create_notice(text, text, text) from public, anon;
 revoke all on function public.acknowledge_notice(uuid) from public, anon;
 revoke all on function public.close_notice(uuid) from public, anon;
-revoke all on function public.request_terminal_pairing(), public.approve_terminal_pairing(text, text, text), public.create_master_notice(text, text, text, text), public.my_master_context() from public, anon;
-grant execute on function public.my_terminal_context(), public.activate_terminal(text), public.create_notice(text, text, text), public.acknowledge_notice(uuid), public.close_notice(uuid), public.request_terminal_pairing(), public.approve_terminal_pairing(text, text, text), public.create_master_notice(text, text, text, text), public.my_master_context() to authenticated;
+revoke all on function public.request_terminal_pairing(), public.approve_terminal_pairing(text, text, text), public.deactivate_terminal(uuid), public.create_master_notice(text, text, text, text), public.my_master_context() from public, anon;
+grant execute on function public.my_terminal_context(), public.activate_terminal(text), public.create_notice(text, text, text), public.acknowledge_notice(uuid), public.close_notice(uuid), public.request_terminal_pairing(), public.approve_terminal_pairing(text, text, text), public.deactivate_terminal(uuid), public.create_master_notice(text, text, text, text), public.my_master_context() to authenticated;
 
 -- Realtime privado: deshabilita también "Allow public access to channels" en
 -- Supabase > Realtime > Settings antes de publicar la nueva versión.
