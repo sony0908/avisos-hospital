@@ -5,7 +5,7 @@
   const state = { client: null, terminal: null, rooms: [], notices: [], acknowledgements: new Set(), channel: null, sound: false, audio: null, refreshTimer: null };
   const el = {
     shell: $('#app-shell'), activation: $('#activation-modal'), activationForm: $('#activation-form'), activationCode: $('#activation-code'), activationError: $('#activation-error'), activationSubmit: $('#activation-submit'),
-    room: $('#terminal-room'), terminalLabel: $('#terminal-label'), description: $('#room-description'), destination: $('#notice-destination'), message: $('#notice-message'), priority: $('#notice-priority'), form: $('#notice-form'), send: $('#send-button'), list: $('#notice-list'),
+    room: $('#terminal-room'), terminalLabel: $('#terminal-label'), title: $('#terminal-title'), description: $('#room-description'), destination: $('#notice-destination'), message: $('#notice-message'), priority: $('#notice-priority'), form: $('#notice-form'), send: $('#send-button'), list: $('#notice-list'),
     dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), toast: $('#toast')
   };
 
@@ -63,7 +63,7 @@
   async function terminal() {
     const { data, error } = await state.client.rpc('my_terminal_context'); if (error) throw error; state.terminal = data?.[0] || null;
     if (!state.terminal) { el.activation.classList.remove('hidden'); el.shell.classList.add('hidden'); setConnection('Terminal pendiente de activación', 'offline'); return false; }
-    el.activation.classList.add('hidden'); el.shell.classList.remove('hidden'); el.room.textContent = state.terminal.room_name; el.terminalLabel.textContent = state.terminal.terminal_label || `Terminal ${state.terminal.room_code}`; el.description.textContent = `Enviando como ${state.terminal.room_name}. Los avisos quedan registrados.`; return true;
+    el.activation.classList.add('hidden'); el.shell.classList.remove('hidden'); el.room.textContent = state.terminal.room_name; el.terminalLabel.textContent = state.terminal.terminal_label || `Terminal ${state.terminal.room_code}`; el.title.textContent = `Canal: ${state.terminal.room_name}`; el.description.textContent = `Enviando como ${state.terminal.room_name}. Los avisos quedan registrados.`; return true;
   }
   async function rooms() {
     const { data, error } = await state.client.from('rooms').select('id, code, name').eq('active', true).order('name'); if (error) throw error; state.rooms = data || [];
