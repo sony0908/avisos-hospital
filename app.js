@@ -81,7 +81,7 @@
       const expires = new Date(pairing.expires_at); el.pairingExpiry.textContent = `QR válido hasta las ${new Intl.DateTimeFormat('es-CL', { timeStyle: 'short' }).format(expires)}. Se actualizará automáticamente.`;
       clearTimeout(state.pairingRefreshTimer); state.pairingRefreshTimer = setTimeout(() => requestPairing().catch(report), Math.max(1000, expires.getTime() - Date.now() - 20000));
       startPairingMonitor();
-    } catch (error) { console.error(error); activationError('No fue posible generar el QR. Comprueba la conexión y vuelve a intentarlo.'); el.pairingExpiry.textContent = 'QR no disponible.'; }
+    } catch (error) { console.error(error); activationError(error?.message || 'No fue posible generar el QR. Comprueba la conexión y vuelve a intentarlo.'); el.pairingExpiry.textContent = 'QR no disponible.'; }
     finally { el.pairingRefresh.disabled = false; }
   }
   async function terminal() {
