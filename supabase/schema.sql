@@ -217,8 +217,8 @@ begin
   if public.current_terminal_id() is not null then raise exception 'Este navegador ya está activado'; end if;
 
   -- Al renovar el QR, el anterior queda inutilizable de inmediato.
-  update public.terminal_pairings set used_at = now()
-  where auth_user_id = auth.uid() and used_at is null and expires_at > now();
+  update public.terminal_pairings p set used_at = now()
+  where p.auth_user_id = auth.uid() and p.used_at is null and p.expires_at > now();
 
   loop
     v_code := '';
