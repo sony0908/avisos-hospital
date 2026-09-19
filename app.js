@@ -76,8 +76,8 @@
       const { data, error } = await state.client.rpc('request_terminal_pairing'); if (error) throw error;
       const pairing = data?.[0]; if (!pairing?.pairing_code) throw new Error('No fue posible generar el QR.');
       state.pairingCode = pairing.pairing_code; el.pairingQr.replaceChildren();
-      if (!window.QRCode?.toCanvas) throw new Error('No se pudo cargar el generador QR. Recarga la página.');
-      const canvas = document.createElement('canvas'); await window.QRCode.toCanvas(canvas, pairing.pairing_code, { width: 250, margin: 2, errorCorrectionLevel: 'M' }); el.pairingQr.append(canvas);
+      if (!window.QRCode) throw new Error('No se pudo cargar el generador QR. Recarga la página.');
+      new window.QRCode(el.pairingQr, { text: pairing.pairing_code, width: 250, height: 250, correctLevel: window.QRCode.CorrectLevel.M });
       const expires = new Date(pairing.expires_at); el.pairingExpiry.textContent = `QR válido hasta las ${new Intl.DateTimeFormat('es-CL', { timeStyle: 'short' }).format(expires)}. Se actualizará automáticamente.`;
       clearTimeout(state.pairingRefreshTimer); state.pairingRefreshTimer = setTimeout(() => requestPairing().catch(report), Math.max(1000, expires.getTime() - Date.now() - 20000));
       startPairingMonitor();
