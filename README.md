@@ -32,7 +32,9 @@ Desde SQL Editor, genera un código de un solo uso. El resultado se muestra una 
 select public.create_activation_code('RAYOS_3', 'Rayos 3 · PC principal');
 ```
 
-Abre la página en el computador de Rayos 3 e introduce ese código. La asociación queda guardada en el navegador. Repite el proceso por sala.
+El código tendrá el formato `ABCD-EFGH-JKMP-QRST`: 16 caracteres, agrupados para anotarlo y transcribirlo con facilidad. No usa `I`, `L`, `O` ni `U`, para evitar confusiones. Los guiones son opcionales al ingresarlo. Abre la página en el computador de Rayos 3 e introduce ese código. La asociación queda guardada en el navegador. Repite el proceso por sala.
+
+> Al ejecutar la actualización, los códigos largos que ya se hubieran creado seguirán siendo válidos hasta su vencimiento.
 
 Para desactivar un computador perdido, reemplazado o que se usó indebidamente, localízalo por etiqueta y revócalo:
 

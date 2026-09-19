@@ -14,7 +14,9 @@ create table if not exists public.rooms (
 insert into public.rooms (code, name) values
   ('THALAMUS', 'Thalamus'), ('SCANER', 'Scaner'), ('RAYOS_3', 'Rayos 3'),
   ('RAYOS_4', 'Rayos 4'), ('RAYOS_5', 'Rayos 5'), ('ECO_3', 'Eco 3')
-on conflict (code) do update set name = excluded.name, active = true;
+-- No reactiva salas que un administrador haya deshabilitado al volver a ejecutar
+-- este esquema para una actualización.
+on conflict (code) do update set name = excluded.name;
 
 create table if not exists public.terminal_activation_codes (
   id uuid primary key default gen_random_uuid(),
@@ -64,8 +66,9 @@ create table if not exists public.notice_acknowledgements (
 -- terminal activado, evitando que un cliente pueda fingir ser otra sala.
 create or replace function public.current_terminal_id()
 returns uuid language sql stable security definer set search_path = public as $$
-  select id from public.terminals
-  where auth_user_id = (select auth.uid()) and active = true
+  select t.id from public.terminals t
+  join public.rooms r on r.id = t.room_id and r.active = true
+  where t.auth_user_id = (select auth.uid()) and t.active = true
   limit 1;
 $$;
 
@@ -88,28 +91,64 @@ create or replace function public.create_activation_code(
   p_room_code text, p_label text default null, p_ttl interval default interval '15 minutes'
 )
 returns text language plpgsql security definer set search_path = public, extensions as $$
-declare v_room_id uuid; v_code text;
+declare
+  v_room_id uuid;
+  v_code text;
+  v_display_code text;
+  v_alphabet constant text := 'ABCDEFGHJKMNPQRSTVWXYZ23456789';
+  v_random_byte integer;
 begin
   if p_ttl < interval '1 minute' or p_ttl > interval '24 hours' then
     raise exception 'La duración debe estar entre 1 minuto y 24 horas';
   end if;
   select id into v_room_id from public.rooms where code = upper(trim(p_room_code)) and active;
   if v_room_id is null then raise exception 'Sala no válida'; end if;
-  v_code := upper(encode(extensions.gen_random_bytes(24), 'hex'));
-  insert into public.terminal_activation_codes(room_id, label, code_hash, expires_at)
-  values (v_room_id, nullif(trim(p_label), ''), encode(extensions.digest(v_code, 'sha256'), 'hex'), now() + p_ttl);
-  return v_code;
+
+  -- 16 caracteres de un alfabeto sin I, L, O ni U: 30^16 posibilidades
+  -- (~78 bits). Los guiones se agregan solo para facilitar el copiado manual.
+  loop
+    v_code := '';
+    while char_length(v_code) < 16 loop
+      v_random_byte := get_byte(extensions.gen_random_bytes(1), 0);
+      -- Evita el sesgo de módulo: 240 es múltiplo exacto de 30.
+      if v_random_byte < 240 then
+        v_code := v_code || substr(v_alphabet, (v_random_byte % 30) + 1, 1);
+      end if;
+    end loop;
+
+    begin
+      insert into public.terminal_activation_codes(room_id, label, code_hash, expires_at)
+      values (v_room_id, nullif(trim(p_label), ''), encode(extensions.digest(v_code, 'sha256'), 'hex'), now() + p_ttl);
+      exit;
+    exception when unique_violation then
+      -- Una colisión es extremadamente improbable; se genera otro código.
+      null;
+    end;
+  end loop;
+
+  v_display_code := substr(v_code, 1, 4) || '-' || substr(v_code, 5, 4)
+    || '-' || substr(v_code, 9, 4) || '-' || substr(v_code, 13, 4);
+  return v_display_code;
 end;
 $$;
 
 create or replace function public.activate_terminal(p_code text)
 returns void language plpgsql security definer set search_path = public, extensions as $$
-declare v_code public.terminal_activation_codes%rowtype;
+declare
+  v_code public.terminal_activation_codes%rowtype;
+  v_normalized_code text := regexp_replace(upper(trim(p_code)), '[-[:space:]]', '', 'g');
 begin
   if auth.uid() is null then raise exception 'Terminal sin identidad'; end if;
   if public.current_terminal_id() is not null then raise exception 'Este navegador ya está activado'; end if;
+
+  -- También se aceptan los códigos hexadecimales largos emitidos antes de esta
+  -- actualización, hasta que expiren, para no interrumpir activaciones en curso.
+  if v_normalized_code !~ '^[ABCDEFGHJKMNPQRSTVWXYZ23456789]{16}$'
+     and v_normalized_code !~ '^[A-F0-9]{48}$' then
+    raise exception 'Formato de código de activación inválido';
+  end if;
   select * into v_code from public.terminal_activation_codes
-  where code_hash = encode(extensions.digest(upper(trim(p_code)), 'sha256'), 'hex')
+  where code_hash = encode(extensions.digest(v_normalized_code, 'sha256'), 'hex')
     and used_at is null and expires_at > now()
   for update;
   if not found then raise exception 'Código de activación inválido o vencido'; end if;
