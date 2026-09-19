@@ -18,23 +18,20 @@ Intercomunicador web para salas compartidas. No crea cuentas para el personal: c
 
 Se requiere acceso de administrador al proyecto Supabase; los computadores clínicos solo necesitan abrir la web.
 
-1. En **Authentication > Providers**, habilita **Anonymous sign-ins**.
+1. En **Authentication > Providers**, habilita **Anonymous sign-ins** y el proveedor **Email** (enlace mágico).
 2. En **SQL Editor**, ejecuta completo [`supabase/schema.sql`](supabase/schema.sql).
 3. En **Realtime > Settings**, desactiva `Allow public access to channels`. Esto fuerza los canales privados definidos en el SQL.
 4. En **Connect**, copia la clave `sb_publishable_...` y reemplaza la clave de `config.js`. La clave heredada funciona temporalmente, pero las claves `anon` se retiran progresivamente; conviene usar la publishable actual.
-5. Publica estos archivos en un sitio HTTPS. No hay servidor ni instalación que hacer en los computadores de sala.
+5. En **Authentication > URL Configuration**, agrega `https://avisos-hospital.vercel.app/master.html` en las URL de redirección permitidas.
+6. Publica estos archivos en un sitio HTTPS. No hay servidor ni instalación que hacer en los computadores de sala.
 
-## Activar un terminal
+## Activar un terminal con QR
 
-Desde SQL Editor, genera un código de un solo uso. El resultado se muestra una única vez:
+1. Abre la página principal en el computador de sala. Mostrará un QR temporal, válido por diez minutos.
+2. Desde un teléfono o PC de administración, abre `master.html` en el mismo sitio publicado e inicia sesión con el correo autorizado.
+3. Escanea el QR, elige la sala y confirma. El computador se activa automáticamente sin copiar claves.
 
-```sql
-select public.create_activation_code('RAYOS_3', 'Rayos 3 · PC principal');
-```
-
-El código tendrá el formato `ABCD-EFGH-JKMP-QRST`: 16 caracteres, agrupados para anotarlo y transcribirlo con facilidad. No usa `I`, `L`, `O` ni `U`, para evitar confusiones. Los guiones son opcionales al ingresarlo. Abre la página en el computador de Rayos 3 e introduce ese código. La asociación queda guardada en el navegador. Repite el proceso por sala.
-
-> Al ejecutar la actualización, los códigos largos que ya se hubieran creado seguirán siendo válidos hasta su vencimiento.
+La consola maestra autorizada es `ericksong4b2016@gmail.com`. Puede monitorear los avisos de todas las salas y enviar como la sala seleccionada. El QR contiene solo un código temporal de un uso; nunca expone la sesión del navegador de sala.
 
 Para desactivar un computador perdido, reemplazado o que se usó indebidamente, localízalo por etiqueta y revócalo:
 

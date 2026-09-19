@@ -2,9 +2,9 @@
   'use strict';
   const config = window.APP_CONFIG || {};
   const $ = (selector) => document.querySelector(selector);
-  const state = { client: null, terminal: null, rooms: [], notices: [], acknowledgements: new Set(), channel: null, sound: false, audio: null, refreshTimer: null };
+  const state = { client: null, terminal: null, rooms: [], notices: [], acknowledgements: new Set(), channel: null, sound: false, audio: null, refreshTimer: null, pairingCode: null, pairingTimer: null, pairingRefreshTimer: null };
   const el = {
-    shell: $('#app-shell'), activation: $('#activation-modal'), activationForm: $('#activation-form'), activationCode: $('#activation-code'), activationError: $('#activation-error'), activationSubmit: $('#activation-submit'),
+    shell: $('#app-shell'), activation: $('#activation-modal'), activationError: $('#activation-error'), pairingQr: $('#pairing-qr'), pairingExpiry: $('#pairing-expiry'), pairingRefresh: $('#pairing-refresh'),
     room: $('#terminal-room'), terminalLabel: $('#terminal-label'), title: $('#terminal-title'), description: $('#room-description'), destination: $('#notice-destination'), message: $('#notice-message'), priority: $('#notice-priority'), form: $('#notice-form'), send: $('#send-button'), list: $('#notice-list'),
     dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), toast: $('#toast')
   };
@@ -60,9 +60,34 @@
     const { data: { session: existing }, error } = await state.client.auth.getSession(); if (error) throw error; if (existing) return existing;
     const { data, error: signInError } = await state.client.auth.signInAnonymously(); if (signInError) throw signInError; return data.session;
   }
+  function stopPairingMonitor() { clearInterval(state.pairingTimer); clearTimeout(state.pairingRefreshTimer); state.pairingTimer = null; state.pairingRefreshTimer = null; state.pairingCode = null; }
+  function startPairingMonitor() {
+    if (state.pairingTimer) return;
+    state.pairingTimer = setInterval(async () => {
+      try {
+        const { data, error } = await state.client.rpc('my_terminal_context'); if (error) throw error;
+        if (data?.[0]) { stopPairingMonitor(); await boot(); }
+      } catch (error) { console.error(error); }
+    }, 3000);
+  }
+  async function requestPairing() {
+    el.pairingRefresh.disabled = true; activationError(); el.pairingExpiry.textContent = 'Generando QR seguro…';
+    try {
+      const { data, error } = await state.client.rpc('request_terminal_pairing'); if (error) throw error;
+      const pairing = data?.[0]; if (!pairing?.pairing_code) throw new Error('No fue posible generar el QR.');
+      state.pairingCode = pairing.pairing_code; el.pairingQr.replaceChildren();
+      if (!window.QRCode?.toCanvas) throw new Error('No se pudo cargar el generador QR. Recarga la página.');
+      const canvas = document.createElement('canvas'); await window.QRCode.toCanvas(canvas, pairing.pairing_code, { width: 250, margin: 2, errorCorrectionLevel: 'M' }); el.pairingQr.append(canvas);
+      const expires = new Date(pairing.expires_at); el.pairingExpiry.textContent = `QR válido hasta las ${new Intl.DateTimeFormat('es-CL', { timeStyle: 'short' }).format(expires)}. Se actualizará automáticamente.`;
+      clearTimeout(state.pairingRefreshTimer); state.pairingRefreshTimer = setTimeout(() => requestPairing().catch(report), Math.max(1000, expires.getTime() - Date.now() - 20000));
+      startPairingMonitor();
+    } catch (error) { console.error(error); activationError('No fue posible generar el QR. Comprueba la conexión y vuelve a intentarlo.'); el.pairingExpiry.textContent = 'QR no disponible.'; }
+    finally { el.pairingRefresh.disabled = false; }
+  }
   async function terminal() {
     const { data, error } = await state.client.rpc('my_terminal_context'); if (error) throw error; state.terminal = data?.[0] || null;
-    if (!state.terminal) { el.activation.classList.remove('hidden'); el.shell.classList.add('hidden'); setConnection('Terminal pendiente de activación', 'offline'); return false; }
+    if (!state.terminal) { el.activation.classList.remove('hidden'); el.shell.classList.add('hidden'); setConnection('Terminal pendiente de asignación', 'offline'); if (!state.pairingCode) await requestPairing(); return false; }
+    stopPairingMonitor();
     el.activation.classList.add('hidden'); el.shell.classList.remove('hidden'); el.room.textContent = state.terminal.room_name; el.terminalLabel.textContent = state.terminal.terminal_label || `Terminal ${state.terminal.room_code}`; el.title.textContent = `Canal: ${state.terminal.room_name}`; el.description.textContent = `Enviando como ${state.terminal.room_name}. Los avisos quedan registrados.`; return true;
   }
   async function rooms() {
@@ -87,12 +112,6 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notice_acknowledgements' }, refreshSoon)
       .subscribe((status) => { if (status === 'SUBSCRIBED') setConnection('Conectado y protegido', 'online'); else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') setConnection('Conexión en recuperación', 'offline'); });
   }
-  async function activate(event) {
-    event.preventDefault(); activationError(); const code = el.activationCode.value.trim().toUpperCase(); if (!code) return; el.activationSubmit.disabled = true;
-    try { const { error } = await state.client.rpc('activate_terminal', { p_code: code }); if (error) throw error; el.activationCode.value = ''; toast('Terminal activado correctamente.', 'success'); await boot(); }
-    catch (error) { console.error(error); activationError('No fue posible activar este terminal. Revisa el código o solicita uno nuevo.'); }
-    finally { el.activationSubmit.disabled = false; }
-  }
   async function send(event) {
     event.preventDefault(); const body = el.message.value.trim(); if (!body) return; el.send.disabled = true;
     try { const { error } = await state.client.rpc('create_notice', { p_destination_code: el.destination.value, p_body: body, p_priority: el.priority.value }); if (error) throw error; el.message.value = ''; await notices(); toast('Aviso enviado y registrado.', 'success'); }
@@ -106,7 +125,7 @@
     state.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, { auth: { persistSession: true, autoRefreshToken: true } });
     const storedTheme = (() => { try { return localStorage.getItem('intercom-theme'); } catch { return null; } })();
     setTheme(storedTheme ? storedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
-    el.activationForm.addEventListener('submit', activate); el.form.addEventListener('submit', send); el.refresh.addEventListener('click', () => notices().then(() => toast('Avisos actualizados.', 'success')).catch(report)); el.sound.addEventListener('click', enableSound); el.headerSound.addEventListener('click', enableSound); el.theme?.addEventListener('click', toggleTheme); el.sidebarTheme?.addEventListener('click', toggleTheme);
+    el.pairingRefresh.addEventListener('click', () => requestPairing()); el.form.addEventListener('submit', send); el.refresh.addEventListener('click', () => notices().then(() => toast('Avisos actualizados.', 'success')).catch(report)); el.sound.addEventListener('click', enableSound); el.headerSound.addEventListener('click', enableSound); el.theme?.addEventListener('click', toggleTheme); el.sidebarTheme?.addEventListener('click', toggleTheme);
     document.querySelectorAll('[data-quick-message]').forEach((button) => button.addEventListener('click', () => { el.message.value = button.dataset.quickMessage || ''; el.priority.value = button.dataset.priority || 'urgent'; el.message.focus(); }));
     addEventListener('online', () => boot().catch(report)); addEventListener('offline', () => setConnection('Sin conexión', 'offline'));
     try { setConnection('Autenticando terminal…'); await session(); await boot(); } catch (error) { setConnection('No se pudo conectar', 'offline'); report(error); }
