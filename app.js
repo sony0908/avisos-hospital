@@ -6,7 +6,7 @@
   const el = {
     shell: $('#app-shell'), activation: $('#activation-modal'), activationError: $('#activation-error'), pairingQr: $('#pairing-qr'), pairingExpiry: $('#pairing-expiry'), pairingRefresh: $('#pairing-refresh'),
     room: $('#terminal-room'), terminalLabel: $('#terminal-label'), title: $('#terminal-title'), description: $('#room-description'), destination: $('#notice-destination'), message: $('#notice-message'), priority: $('#notice-priority'), form: $('#notice-form'), send: $('#send-button'), list: $('#notice-list'),
-    dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), toast: $('#toast')
+    dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), clock: $('#clinical-clock'), toast: $('#toast')
   };
 
   const priorityName = { immediate: 'Inmediato', urgent: 'Urgente', routine: 'No urgente' };
@@ -18,6 +18,15 @@
     if (el.themeLabel) el.themeLabel.textContent = dark ? 'Modo claro' : 'Modo nocturno';
   }
   function toggleTheme() { setTheme(!document.documentElement.classList.contains('dark')); }
+  function startClock() {
+    const update = () => {
+      if (!el.clock) return;
+      const now = new Date();
+      el.clock.dateTime = now.toISOString();
+      el.clock.textContent = new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(now);
+    };
+    update(); setInterval(update, 1000);
+  }
   const roomName = (id) => state.rooms.find((room) => room.id === id)?.name || 'Sala no disponible';
   const formatTime = (value) => new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
   function toast(message, kind = '') { el.toast.textContent = message; el.toast.className = `toast ${kind}`; clearTimeout(toast.timer); toast.timer = setTimeout(() => el.toast.classList.add('hidden'), 4800); }
@@ -138,6 +147,7 @@
     state.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, { auth: { persistSession: true, autoRefreshToken: true } });
     const storedTheme = (() => { try { return localStorage.getItem('intercom-theme'); } catch { return null; } })();
     setTheme(storedTheme ? storedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
+    startClock();
     el.pairingRefresh.addEventListener('click', () => requestPairing()); el.form.addEventListener('submit', send); el.refresh.addEventListener('click', () => notices().then(() => toast('Avisos actualizados.', 'success')).catch(report)); el.sound.addEventListener('click', enableSound); el.headerSound.addEventListener('click', enableSound); el.theme?.addEventListener('click', toggleTheme); el.sidebarTheme?.addEventListener('click', toggleTheme);
     document.querySelectorAll('[data-quick-message]').forEach((button) => button.addEventListener('click', () => { el.message.value = button.dataset.quickMessage || ''; el.priority.value = button.dataset.priority || 'urgent'; el.message.focus(); }));
     addEventListener('online', () => boot().catch(report)); addEventListener('offline', () => setConnection('Sin conexión', 'offline'));
