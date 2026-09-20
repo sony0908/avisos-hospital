@@ -6,7 +6,7 @@
   const el = {
     shell: $('#app-shell'), activation: $('#activation-modal'), activationError: $('#activation-error'), pairingQr: $('#pairing-qr'), pairingExpiry: $('#pairing-expiry'), pairingRefresh: $('#pairing-refresh'),
     room: $('#terminal-room'), terminalLabel: $('#terminal-label'), title: $('#terminal-title'), description: $('#room-description'), destination: $('#notice-destination'), message: $('#notice-message'), priority: $('#notice-priority'), form: $('#notice-form'), send: $('#send-button'), list: $('#notice-list'),
-    dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), clock: $('#clinical-clock'), shiftLabel: $('#shift-label'), roomList: $('#room-list'), roomCount: $('#room-count'), customTemplates: $('#custom-templates'), addTemplate: $('#add-template-button'), templateModal: $('#template-modal'), templateForm: $('#template-form'), templateEmoji: $('#template-emoji'), templateLabel: $('#template-label'), templateMessage: $('#template-message'), templatePriority: $('#template-priority'), templateCancel: $('#template-cancel'), toast: $('#toast')
+    dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), fourthCountdown: $('#fourth-countdown'), fourthLabel: $('#fourth-label'), diurnalCountdown: $('#diurnal-countdown'), diurnalLabel: $('#diurnal-label'), roomList: $('#room-list'), roomCount: $('#room-count'), destinationBanner: $('#destination-banner'), destinationName: $('#destination-name'), customTemplates: $('#custom-templates'), addTemplate: $('#add-template-button'), templateModal: $('#template-modal'), templateForm: $('#template-form'), templateEmoji: $('#template-emoji'), templateLabel: $('#template-label'), templateMessage: $('#template-message'), templatePriority: $('#template-priority'), templateCancel: $('#template-cancel'), toast: $('#toast')
   };
 
   const priorityName = { immediate: 'Inmediato', urgent: 'Urgente', routine: 'No urgente' };
@@ -36,42 +36,39 @@
     else holidays.add(dateKey(reformation));
     return holidays;
   }
-  function isReducedScheduleDay(date) { return date.getDay() === 0 || date.getDay() === 6 || chileHolidays(date.getFullYear()).has(dateKey(date)); }
-  function nextShiftStart(date) {
-    const candidate = new Date(date);
-    for (let offset = 0; offset < 10; offset += 1) {
-      if (offset) candidate.setDate(candidate.getDate() + 1);
-      const start = dateAt(candidate, isReducedScheduleDay(candidate) ? 9 : 8);
-      if (start > date) return start;
-    }
-    return dateAt(candidate, 8);
+  const isHoliday = (date) => chileHolidays(date.getFullYear()).has(dateKey(date));
+  const isWeekend = (date) => date.getDay() === 0 || date.getDay() === 6;
+  function fourthTurnTarget(now) {
+    const dayStart = dateAt(now, isWeekend(now) || isHoliday(now) ? 9 : 8); const twenty = dateAt(now, 20);
+    if (now < dayStart) return { label: 'Fin noche', target: dayStart };
+    if (now < twenty) return { label: 'Fin largo', target: twenty };
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    return { label: 'Fin noche', target: dateAt(tomorrow, isWeekend(tomorrow) || isHoliday(tomorrow) ? 9 : 8) };
   }
-  function shiftDeadline(now) {
-    const reduced = isReducedScheduleDay(now); const todayStart = dateAt(now, reduced ? 9 : 8); const todayEnd = dateAt(now, 20);
-    if (reduced) {
-      if (now < todayStart) return { label: 'Próximo turno:', target: todayStart };
-      if (now < todayEnd) return { label: 'Fin turno:', target: todayEnd };
-      return { label: 'Próximo turno:', target: nextShiftStart(new Date(now.getTime() + 1000)) };
+  function nextDiurnalStart(now) {
+    for (let offset = 0; offset <= 14; offset += 1) {
+      const day = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+      if (isWeekend(day) || isHoliday(day)) continue;
+      const start = dateAt(day, 8);
+      if (start > now) return start;
     }
-    const eight = dateAt(now, 8); const twenty = dateAt(now, 20);
-    if (now < eight) {
-      const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
-      return isReducedScheduleDay(yesterday) ? { label: 'Próximo turno:', target: eight } : { label: 'Fin turno:', target: eight };
+    return dateAt(now, 8);
+  }
+  function diurnalTarget(now) {
+    if (!isWeekend(now) && !isHoliday(now)) {
+      const start = dateAt(now, 8); const end = dateAt(now, now.getDay() === 5 ? 16 : 17);
+      if (now < start) return { label: 'Inicio jornada', target: start };
+      if (now < end) return { label: 'Fin jornada', target: end };
     }
-    if (now < twenty) return { label: 'Fin turno:', target: twenty };
-    const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
-    return isReducedScheduleDay(tomorrow) ? { label: 'Próximo turno:', target: dateAt(tomorrow, 9) } : { label: 'Fin turno:', target: dateAt(tomorrow, 8) };
+    return { label: 'Próxima jornada', target: nextDiurnalStart(now) };
   }
-  function startShiftCountdown() {
-    const update = () => {
-      if (!el.clock) return;
-      const now = new Date(); const deadline = shiftDeadline(now); const remaining = Math.max(0, deadline.target.getTime() - now.getTime());
-      const hours = Math.floor(remaining / 3600000); const minutes = Math.floor((remaining % 3600000) / 60000); const seconds = Math.floor((remaining % 60000) / 1000);
-      el.clock.dateTime = deadline.target.toISOString(); el.clock.textContent = [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
-      if (el.shiftLabel) el.shiftLabel.textContent = deadline.label;
-    };
-    update(); setInterval(update, 1000);
+  function renderCountdown(countdown, label, schedule) {
+    if (!countdown || !label) return;
+    const remaining = Math.max(0, schedule.target.getTime() - Date.now()); const hours = Math.floor(remaining / 3600000); const minutes = Math.floor((remaining % 3600000) / 60000); const seconds = Math.floor((remaining % 60000) / 1000);
+    label.textContent = schedule.label; countdown.dateTime = schedule.target.toISOString(); countdown.textContent = [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
   }
+  function updateShiftCountdowns() { const now = new Date(); renderCountdown(el.fourthCountdown, el.fourthLabel, fourthTurnTarget(now)); renderCountdown(el.diurnalCountdown, el.diurnalLabel, diurnalTarget(now)); }
+  function startShiftCountdowns() { updateShiftCountdowns(); setInterval(updateShiftCountdowns, 1000); }
   const templateStorageKey = () => state.terminal ? `intercom-templates:${state.terminal.room_code}` : null;
   function loadTemplates() {
     state.templates = [];
@@ -100,16 +97,26 @@
     state.templates.push({ id: window.crypto?.randomUUID?.() || String(Date.now()), emoji: el.templateEmoji.value.trim() || '📌', label, body, priority: el.templatePriority.value });
     if (saveTemplates()) { renderCustomTemplates(); closeTemplateModal(); toast('Plantilla guardada para esta sala en este navegador.', 'success'); }
   }
+  function updateDestinationSelection() {
+    const code = el.destination.value; const room = state.rooms.find((item) => item.code === code);
+    if (el.destinationName) el.destinationName.textContent = code === 'ALL' ? 'Todas las salas' : room?.name || 'Selecciona una sala';
+    document.querySelectorAll('.room-item').forEach((row) => {
+      const selected = row.dataset.roomCode === code; row.classList.toggle('selected', selected); row.setAttribute('aria-pressed', String(selected));
+    });
+  }
   function renderRoomList() {
     if (!el.roomList || !el.roomCount) return;
     el.roomCount.textContent = `${state.rooms.length} sala${state.rooms.length === 1 ? '' : 's'} registrada${state.rooms.length === 1 ? '' : 's'}`;
     el.roomList.replaceChildren();
-    state.rooms.forEach((room) => {
-      const row = document.createElement('button'); row.type = 'button'; row.className = 'room-item'; row.title = `Seleccionar ${room.name} como destino`;
+    const addRoom = (room, detail) => {
+      const row = document.createElement('button'); row.type = 'button'; row.className = 'room-item'; row.dataset.roomCode = room.code; row.title = `Seleccionar ${room.name} como destino`;
       const main = document.createElement('span'); main.className = 'room-item-main'; const symbol = document.createElement('span'); symbol.className = 'room-symbol'; symbol.textContent = '◈';
-      const copy = document.createElement('span'); const name = document.createElement('strong'); name.textContent = room.name; const detail = document.createElement('small'); detail.textContent = room.code === state.terminal.room_code ? 'Esta terminal' : 'Sala registrada';
-      copy.append(name, detail); main.append(symbol, copy); row.append(main); row.addEventListener('click', () => { el.destination.value = room.code; toast(`Destino seleccionado: ${room.name}.`, 'success'); }); el.roomList.append(row);
-    });
+      const copy = document.createElement('span'); const name = document.createElement('strong'); name.textContent = room.name; const subtitle = document.createElement('small'); subtitle.textContent = detail;
+      copy.append(name, subtitle); main.append(symbol, copy); row.append(main); row.addEventListener('click', () => { el.destination.value = room.code; updateDestinationSelection(); toast(`Destino seleccionado: ${room.name}.`, 'success'); }); el.roomList.append(row);
+    };
+    if (state.terminal.room_code === 'THALAMUS') addRoom({ code: 'ALL', name: 'Todas las salas' }, 'Envío general');
+    state.rooms.forEach((room) => addRoom(room, room.code === state.terminal.room_code ? 'Esta terminal' : 'Sala registrada'));
+    updateDestinationSelection();
   }
   const roomName = (id) => state.rooms.find((room) => room.id === id)?.name || 'Sala no disponible';
   const formatTime = (value) => new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
@@ -232,9 +239,10 @@
     state.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, { auth: { persistSession: true, autoRefreshToken: true } });
     const storedTheme = (() => { try { return localStorage.getItem('intercom-theme'); } catch { return null; } })();
     setTheme(storedTheme ? storedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
-    startShiftCountdown();
+    startShiftCountdowns();
     el.pairingRefresh.addEventListener('click', () => requestPairing()); el.form.addEventListener('submit', send); el.refresh.addEventListener('click', () => notices().then(() => toast('Avisos actualizados.', 'success')).catch(report)); el.sound.addEventListener('click', enableSound); el.headerSound.addEventListener('click', enableSound); el.theme?.addEventListener('click', toggleTheme); el.sidebarTheme?.addEventListener('click', toggleTheme);
     el.addTemplate.addEventListener('click', openTemplateModal); el.templateCancel.addEventListener('click', closeTemplateModal); el.templateForm.addEventListener('submit', addTemplate);
+    el.destination.addEventListener('change', updateDestinationSelection);
     document.querySelectorAll('[data-quick-message]').forEach((button) => button.addEventListener('click', () => { el.message.value = button.dataset.quickMessage || ''; el.priority.value = button.dataset.priority || 'urgent'; el.message.focus(); }));
     addEventListener('online', () => boot().catch(report)); addEventListener('offline', () => setConnection('Sin conexión', 'offline'));
     try { setConnection('Autenticando terminal…'); await session(); await boot(); } catch (error) { setConnection('No se pudo conectar', 'offline'); report(error); }
