@@ -2,11 +2,11 @@
   'use strict';
   const config = window.APP_CONFIG || {};
   const $ = (selector) => document.querySelector(selector);
-  const state = { client: null, terminal: null, rooms: [], notices: [], acknowledgements: new Set(), channel: null, sound: false, audio: null, refreshTimer: null, pairingCode: null, pairingTimer: null, pairingRefreshTimer: null, terminalWatchTimer: null };
+  const state = { client: null, terminal: null, rooms: [], notices: [], acknowledgements: new Set(), templates: [], channel: null, sound: false, audio: null, refreshTimer: null, pairingCode: null, pairingTimer: null, pairingRefreshTimer: null, terminalWatchTimer: null };
   const el = {
     shell: $('#app-shell'), activation: $('#activation-modal'), activationError: $('#activation-error'), pairingQr: $('#pairing-qr'), pairingExpiry: $('#pairing-expiry'), pairingRefresh: $('#pairing-refresh'),
     room: $('#terminal-room'), terminalLabel: $('#terminal-label'), title: $('#terminal-title'), description: $('#room-description'), destination: $('#notice-destination'), message: $('#notice-message'), priority: $('#notice-priority'), form: $('#notice-form'), send: $('#send-button'), list: $('#notice-list'),
-    dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), clock: $('#clinical-clock'), toast: $('#toast')
+    dot: $('#connection-dot'), connection: $('#connection-status'), refresh: $('#refresh-button'), sound: $('#sound-button'), headerSound: $('#header-sound-button'), theme: $('#theme-toggle'), sidebarTheme: $('#sidebar-theme-toggle'), themeIcon: $('#theme-icon'), themeLabel: $('#theme-label'), clock: $('#clinical-clock'), shiftLabel: $('#shift-label'), roomList: $('#room-list'), roomCount: $('#room-count'), customTemplates: $('#custom-templates'), addTemplate: $('#add-template-button'), templateModal: $('#template-modal'), templateForm: $('#template-form'), templateEmoji: $('#template-emoji'), templateLabel: $('#template-label'), templateMessage: $('#template-message'), templatePriority: $('#template-priority'), templateCancel: $('#template-cancel'), toast: $('#toast')
   };
 
   const priorityName = { immediate: 'Inmediato', urgent: 'Urgente', routine: 'No urgente' };
@@ -18,14 +18,98 @@
     if (el.themeLabel) el.themeLabel.textContent = dark ? 'Modo claro' : 'Modo nocturno';
   }
   function toggleTheme() { setTheme(!document.documentElement.classList.contains('dark')); }
-  function startClock() {
+  const dateKey = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+  const dateAt = (date, hour) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, 0, 0, 0);
+  function easterSunday(year) {
+    const a = year % 19; const b = Math.floor(year / 100); const c = year % 100; const d = Math.floor(b / 4); const e = b % 4;
+    const f = Math.floor((b + 8) / 25); const g = Math.floor((b - f + 1) / 3); const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4); const k = c % 4; const l = (32 + 2 * e + 2 * i - h - k) % 7; const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    return new Date(year, Math.floor((h + l - 7 * m + 114) / 31) - 1, (h + l - 7 * m + 114) % 31 + 1);
+  }
+  function chileHolidays(year) {
+    const fixed = [[0, 1], [4, 1], [4, 21], [5, 21], [5, 29], [6, 16], [7, 15], [8, 18], [8, 19], [9, 12], [10, 1], [11, 8], [11, 25]];
+    const holidays = new Set(fixed.map(([month, day]) => dateKey(new Date(year, month, day))));
+    const easter = easterSunday(year); [-2, -1].forEach((offset) => { const day = new Date(easter); day.setDate(day.getDate() + offset); holidays.add(dateKey(day)); });
+    const reformation = new Date(year, 9, 31);
+    if (reformation.getDay() === 2) holidays.add(dateKey(new Date(year, 9, 27)));
+    else if (reformation.getDay() === 3) holidays.add(dateKey(new Date(year, 10, 2)));
+    else holidays.add(dateKey(reformation));
+    return holidays;
+  }
+  function isReducedScheduleDay(date) { return date.getDay() === 0 || date.getDay() === 6 || chileHolidays(date.getFullYear()).has(dateKey(date)); }
+  function nextShiftStart(date) {
+    const candidate = new Date(date);
+    for (let offset = 0; offset < 10; offset += 1) {
+      if (offset) candidate.setDate(candidate.getDate() + 1);
+      const start = dateAt(candidate, isReducedScheduleDay(candidate) ? 9 : 8);
+      if (start > date) return start;
+    }
+    return dateAt(candidate, 8);
+  }
+  function shiftDeadline(now) {
+    const reduced = isReducedScheduleDay(now); const todayStart = dateAt(now, reduced ? 9 : 8); const todayEnd = dateAt(now, 20);
+    if (reduced) {
+      if (now < todayStart) return { label: 'Próximo turno:', target: todayStart };
+      if (now < todayEnd) return { label: 'Fin turno:', target: todayEnd };
+      return { label: 'Próximo turno:', target: nextShiftStart(new Date(now.getTime() + 1000)) };
+    }
+    const eight = dateAt(now, 8); const twenty = dateAt(now, 20);
+    if (now < eight) {
+      const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1);
+      return isReducedScheduleDay(yesterday) ? { label: 'Próximo turno:', target: eight } : { label: 'Fin turno:', target: eight };
+    }
+    if (now < twenty) return { label: 'Fin turno:', target: twenty };
+    const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1);
+    return isReducedScheduleDay(tomorrow) ? { label: 'Próximo turno:', target: dateAt(tomorrow, 9) } : { label: 'Fin turno:', target: dateAt(tomorrow, 8) };
+  }
+  function startShiftCountdown() {
     const update = () => {
       if (!el.clock) return;
-      const now = new Date();
-      el.clock.dateTime = now.toISOString();
-      el.clock.textContent = new Intl.DateTimeFormat('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(now);
+      const now = new Date(); const deadline = shiftDeadline(now); const remaining = Math.max(0, deadline.target.getTime() - now.getTime());
+      const hours = Math.floor(remaining / 3600000); const minutes = Math.floor((remaining % 3600000) / 60000); const seconds = Math.floor((remaining % 60000) / 1000);
+      el.clock.dateTime = deadline.target.toISOString(); el.clock.textContent = [hours, minutes, seconds].map((value) => String(value).padStart(2, '0')).join(':');
+      if (el.shiftLabel) el.shiftLabel.textContent = deadline.label;
     };
     update(); setInterval(update, 1000);
+  }
+  const templateStorageKey = () => state.terminal ? `intercom-templates:${state.terminal.room_code}` : null;
+  function loadTemplates() {
+    state.templates = [];
+    try { const saved = JSON.parse(localStorage.getItem(templateStorageKey()) || '[]'); if (Array.isArray(saved)) state.templates = saved.filter((template) => template && typeof template.body === 'string' && typeof template.label === 'string').slice(0, 30); }
+    catch { /* Una configuración local dañada no debe bloquear el canal. */ }
+  }
+  function saveTemplates() {
+    try { localStorage.setItem(templateStorageKey(), JSON.stringify(state.templates)); return true; }
+    catch { toast('No se pudo guardar la plantilla en este navegador.', 'error'); return false; }
+  }
+  function useTemplate(template) { el.message.value = template.body; el.priority.value = template.priority || 'urgent'; el.message.focus(); }
+  function renderCustomTemplates() {
+    if (!el.customTemplates) return;
+    el.customTemplates.replaceChildren();
+    state.templates.forEach((template) => {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'quick'; button.textContent = `${template.emoji || '📌'} ${template.label}`;
+      button.addEventListener('click', () => useTemplate(template)); el.customTemplates.append(button);
+    });
+  }
+  function openTemplateModal() { el.templateForm.reset(); el.templatePriority.value = 'urgent'; el.templateModal.classList.remove('hidden'); el.templateEmoji.focus(); }
+  function closeTemplateModal() { el.templateModal.classList.add('hidden'); }
+  function addTemplate(event) {
+    event.preventDefault();
+    const label = el.templateLabel.value.trim(); const body = el.templateMessage.value.trim();
+    if (!label || !body) return;
+    state.templates.push({ id: window.crypto?.randomUUID?.() || String(Date.now()), emoji: el.templateEmoji.value.trim() || '📌', label, body, priority: el.templatePriority.value });
+    if (saveTemplates()) { renderCustomTemplates(); closeTemplateModal(); toast('Plantilla guardada para esta sala en este navegador.', 'success'); }
+  }
+  function renderRoomList() {
+    if (!el.roomList || !el.roomCount) return;
+    el.roomCount.textContent = `${state.rooms.length} sala${state.rooms.length === 1 ? '' : 's'} registrada${state.rooms.length === 1 ? '' : 's'}`;
+    el.roomList.replaceChildren();
+    state.rooms.forEach((room) => {
+      const row = document.createElement('button'); row.type = 'button'; row.className = 'room-item'; row.title = `Seleccionar ${room.name} como destino`;
+      const main = document.createElement('span'); main.className = 'room-item-main'; const symbol = document.createElement('span'); symbol.className = 'room-symbol'; symbol.textContent = '◈';
+      const copy = document.createElement('span'); const name = document.createElement('strong'); name.textContent = room.name; const detail = document.createElement('small'); detail.textContent = room.code === state.terminal.room_code ? 'Esta terminal' : 'Sala registrada';
+      copy.append(name, detail); main.append(symbol, copy); row.append(main); row.addEventListener('click', () => { el.destination.value = room.code; toast(`Destino seleccionado: ${room.name}.`, 'success'); }); el.roomList.append(row);
+    });
   }
   const roomName = (id) => state.rooms.find((room) => room.id === id)?.name || 'Sala no disponible';
   const formatTime = (value) => new Intl.DateTimeFormat('es-CL', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value));
@@ -110,13 +194,14 @@
     const { data, error } = await state.client.rpc('my_terminal_context'); if (error) throw error; state.terminal = data?.[0] || null;
     if (!state.terminal) { el.activation.classList.remove('hidden'); el.shell.classList.add('hidden'); setConnection('Terminal pendiente de asignación', 'offline'); if (!state.pairingCode) await requestPairing(); return false; }
     stopPairingMonitor(); startTerminalWatch();
-    el.activation.classList.add('hidden'); el.shell.classList.remove('hidden'); el.room.textContent = state.terminal.room_name; el.terminalLabel.textContent = state.terminal.terminal_label || `Terminal ${state.terminal.room_code}`; el.title.textContent = `Canal: ${state.terminal.room_name}`; el.description.textContent = `Enviando como ${state.terminal.room_name}. Los avisos quedan registrados.`; return true;
+    el.activation.classList.add('hidden'); el.shell.classList.remove('hidden'); el.room.textContent = state.terminal.room_name; el.terminalLabel.textContent = state.terminal.terminal_label || `Terminal ${state.terminal.room_code}`; el.title.textContent = state.terminal.room_name; el.description.textContent = `Enviando como ${state.terminal.room_name}. Los avisos quedan registrados.`; loadTemplates(); renderCustomTemplates(); return true;
   }
   async function rooms() {
     const { data, error } = await state.client.from('rooms').select('id, code, name').eq('active', true).order('name'); if (error) throw error; state.rooms = data || [];
     el.destination.replaceChildren(); if (state.terminal.room_code === 'THALAMUS') el.destination.add(new Option('⚠️ Todas las salas', 'ALL'));
     state.rooms.forEach((room) => el.destination.add(new Option(room.name, room.code)));
     const anotherRoom = state.rooms.find((room) => room.code !== state.terminal.room_code); if (anotherRoom) el.destination.value = anotherRoom.code;
+    renderRoomList();
   }
   async function notices() {
     const [noticeResponse, acknowledgementResponse] = await Promise.all([
@@ -147,8 +232,9 @@
     state.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, { auth: { persistSession: true, autoRefreshToken: true } });
     const storedTheme = (() => { try { return localStorage.getItem('intercom-theme'); } catch { return null; } })();
     setTheme(storedTheme ? storedTheme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches);
-    startClock();
+    startShiftCountdown();
     el.pairingRefresh.addEventListener('click', () => requestPairing()); el.form.addEventListener('submit', send); el.refresh.addEventListener('click', () => notices().then(() => toast('Avisos actualizados.', 'success')).catch(report)); el.sound.addEventListener('click', enableSound); el.headerSound.addEventListener('click', enableSound); el.theme?.addEventListener('click', toggleTheme); el.sidebarTheme?.addEventListener('click', toggleTheme);
+    el.addTemplate.addEventListener('click', openTemplateModal); el.templateCancel.addEventListener('click', closeTemplateModal); el.templateForm.addEventListener('submit', addTemplate);
     document.querySelectorAll('[data-quick-message]').forEach((button) => button.addEventListener('click', () => { el.message.value = button.dataset.quickMessage || ''; el.priority.value = button.dataset.priority || 'urgent'; el.message.focus(); }));
     addEventListener('online', () => boot().catch(report)); addEventListener('offline', () => setConnection('Sin conexión', 'offline'));
     try { setConnection('Autenticando terminal…'); await session(); await boot(); } catch (error) { setConnection('No se pudo conectar', 'offline'); report(error); }
